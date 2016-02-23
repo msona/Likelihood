@@ -36,7 +36,7 @@ Der selbst geschriebene Minimierer wird dann mit dem Minimierer Minuit2 verglich
 #include "cmath"
 #include "cassert"
 #include "Cintex/Cintex.h"
-#include "ttbarrec.h"
+
 
 //neue includes für Einlesen von *.csv Dateien:
 #include "Riostream.h"
