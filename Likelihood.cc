@@ -83,6 +83,10 @@ Double_t likelihood(Double_t *x,Double_t *par);
 Double_t likelihood1d(const Double_t *x,const Double_t *par);
 Double_t likelihoodxy(const Double_t *x);
 
+int NumericalMinimization();
+int NumericalMinimization2();
+int NumericalMinimization3();
+int NumericalMinimization4();
 
 //globale Variablen (damit bei Funktionsaufrufen nicht weitere Parameterübergaben nötig sind)
 int AnzahlEvents=0;
@@ -117,10 +121,10 @@ int main(int argc, char **argv)
    //pathName.ReplaceAll("/./","/");
 
    //Einlesen und konvertieren von *.csv Datei nach *.root
-   TFile *f = new TFile("dielectron100k.root","RECREATE");
+   TFile *f = new TFile("Ergebnisse/dielectron100k.root","RECREATE");
    TTree *tree = new TTree("ntuple","Daten aus einer *.csv Datei");
    //tree->ReadFile("dielectron100k.csv","Type/C:Run/D:Event/D:E1/D:px1/D:py1/D:pz1/D:pt1/D:eta1/D:phi1/D:Q1/D:E2/D:px2/D:py2/D:pz2/D:pt2/D:eta2/D:phi2/D:Q2/D:M/D",',');
-   tree->ReadFile("dielectron100k.csv","Run/D:Event/D:E1/D:px1/D:py1/D:pz1/D:pt1/D:eta1/D:phi1/D:Q1/D:E2/D:px2/D:py2/D:pz2/D:pt2/D:eta2/D:phi2/D:Q2/D:M/D",',');
+   tree->ReadFile("Daten/dielectron100k.csv","Run/D:Event/D:E1/D:px1/D:py1/D:pz1/D:pt1/D:eta1/D:phi1/D:Q1/D:E2/D:px2/D:py2/D:pz2/D:pt2/D:eta2/D:phi2/D:Q2/D:M/D",',');
    
    f->Write();
   
@@ -170,7 +174,7 @@ int main(int argc, char **argv)
  tree->SetBranchAddress("pt1",&pt1);
  tree->SetBranchAddress("pt2",&pt2);
  
- TFile f1("tree1.root","recreate");
+ TFile f1("Ergebnisse/tree1.root","recreate");
  TTree t1("t1","a simple Tree with simple variables");
  
  TH1F *hHt   = new TH1F("hHt"," Transversale Impulssumme Ht=pt1+pt2",500,0,310);
@@ -600,11 +604,12 @@ par1=parameter1;
 
 cout << endl;
 cout << endl;
-cout << " MaximumLikelihoodfunktion gefunden für Parameter "<<" p1= "<<parameter1<<" p2= "<<parameter2<<"  Likelihoodfunktion= "<<  MaxLikelihood1<<endl;
+cout << " eigene Gittersuchmethode: Minimum der LogLikelihoodfunktion gefunden fuer Parameter "<<" p1= "<<parameter1<<" p2= "<<parameter2<<"  Likelihoodfunktion= "<<  MaxLikelihood1<<endl;;
+cout<< "  Anzahl Funktionsauswertungen bis das Minimum erreicht ist :"<<counter<<endl;
 
-cout << " GetMean =  "<< hMasseCut->GetMean()<<" GetRMS = " <<hMasseCut->GetRMS()<< "  Anzahl Events: "<< AnzahlEvents <<endl;
+//cout << " GetMean =  "<< hMasseCut->GetMean()<<" GetRMS = " <<hMasseCut->GetRMS()<< "  Anzahl Events: "<< AnzahlEvents <<endl;
 cout <<endl;
-cout<<endl;
+
 
 
 
@@ -630,21 +635,22 @@ ROOT::Math::Functor f5(&likelihoodxy,2); //Minuit2 findet hier das richtige Mini
    // Set the free variables to be minimized!
    min.SetVariable(0,"x",variable[0], step[0]);
    min.SetVariable(1,"y",variable[1], step[1]);
+   //min.SetVariable(2,"z",variable[2], step[2]);
  
    min.Minimize(); 
  
    const double *xs = min.X();
-   cout << "   Minuit2:  Minimum: f(" << xs[0] << "," << xs[1] << ")  =   " << likelihoodxy(xs) << endl << endl<<endl;
+   cout << "---Minuit2:  Minimum: f(" << xs[0] << "," << xs[1] << ")  =   " << likelihoodxy(xs) << endl << endl<<endl;
    
-   cout<< "Minuit2 Hesse: min.Hesse(); "<<min.Hesse()<<endl;
+   cout<< "Minuit2 Hesse():  "<<min.Hesse()<<endl;
    
-   cout<< "Minuit2 PrintResults: "<<endl;
+  
    min.PrintResults();   //print result of minimization. Quelle: Minuit2-Class-Reference, Members der Minuit2-Klasse
+   cout<<endl;
+   cout<< "Minuit2 Correlation between Variable 0 and 1:   "<<min.Correlation(0,1)<<endl;
    
-   cout<< "Minuit2 Correlation between Variable 0 und 1:   "<<min.Correlation(0,1)<<endl;
-   
-   cout<< "Minuit2 min.Errors: "<<min.Errors()<<endl;
-   cout<< "Minuit2 min.ProvidesError: "<<min.ProvidesError()<<endl;
+   //cout<< "Minuit2 min.Errors: "<<min.Errors()<<endl;
+   cout<< "Minuit2 ProvidesError:  "<<min.ProvidesError()<<endl;
    cout<< "Minuit2 min.NCalls:  number of function calls to reach the minimum :"<<min.NCalls()<<endl;
    
    cout<<endl;
@@ -654,20 +660,50 @@ ROOT::Math::Functor f5(&likelihoodxy,2); //Minuit2 findet hier das richtige Mini
 //Minuit1:
 
   
-TMinuit *gMinuit = new TMinuit(2);  //initialize TMinuit with a maximum of 2 params
+//TMinuit *gMinuit = new TMinuit(2);  //initialize TMinuit with a maximum of 2 params
 //TMinuit minuit(2);
 
-// Beginn-Minimierung per Root-------------------------------------------------------------------
+   
+// Beginn-Minimierung per Root (GSLMinimizer)-------------------------------------------------------------------
 
-  // Choose method upon creation between:
+ // Choose method upon creation between:
    // kConjugateFR, kConjugatePR, kVectorBFGS,
    // kVectorBFGS2, kSteepestDescent
- // ROOT::Math::GSLSimAnMinimizer min;
+   ROOT::Math::GSLMinimizer min2( ROOT::Math::kVectorBFGS );
+ 
+   min2.SetMaxFunctionCalls(1000000);
+   min2.SetMaxIterations(100000);
+   min2.SetTolerance(0.001);
+ 
+   ROOT::Math::Functor f6(&likelihoodxy,2); 
+   double step2[2] = {0.01,0.01};
+   double variable2[2] = {80.0,6.0};
+ 
+   min2.SetFunction(f6);
+ 
+   // Set the free variables to be minimized!
+   min2.SetVariable(0,"x",variable2[0], step2[0]);
+   min2.SetVariable(1,"y",variable2[1], step2[1]);
+ 
+   min2.Minimize(); 
+ 
+   const double *xs2 = min2.X();
+   cout << "GSLMinimizer_kVectorBFGS :  Minimum: f(" << xs2[0] << "," << xs2[1] << "): "  << likelihoodxy(xs) << endl;
+   cout << "number of function calls to reach the minimum :"<<min2.NCalls()<<endl;
+   cout << "minimizer provides error and error matrix: (0=false or 1=true) "<<min2.ProvidesError()<<endl;
+   cout << "min.Errors: "<<min2.Errors()<<endl;
 
 
+// Ende GSLMinimizer-Minimierung-------------------------------------------------------------------
+//   
+NumericalMinimization();   
 
+NumericalMinimization2();
 
-// Ende TMinuit-Minimierung-------------------------------------------------------------------
+NumericalMinimization3();
+
+NumericalMinimization4();
+//-----------------------------------------------------------------------------------------   
 
 par[1]=parameter1;
 par[2]=parameter2;
@@ -736,7 +772,7 @@ c5->Write();
    // Normalverteilung, normiert auf 1
 Double_t gauss(Double_t *x,Double_t *par){
       
-      Double_t fitval = 700*0.39894228*(TMath::Exp(-0.5*((x[0]-par[1])*(x[0]-par[1]))/(par[2]*par[2]) ))/par[2];
+      Double_t fitval = 800*0.39894228*(TMath::Exp(-0.5*((x[0]-par[1])*(x[0]-par[1]))/(par[2]*par[2]) ))/par[2];
       return fitval;
    }  
 // Funktion berechnet die Log-Likelihood-Funktion mit *x==Array der x-Werte;*par==Parameter für Optimierung
@@ -759,7 +795,7 @@ Double_t likelihood1d(const Double_t *x,const Double_t *par){
 
        //xwerte[i] enthält den Wert M für Event i
  
-  Likelihood=Likelihood+  log(700*0.39894228*(TMath::Exp(-0.5*((xwerte[i]-x[0])*(xwerte[i]-x[0]))/(x[1]*x[1]) ))/x[1]);
+  Likelihood=Likelihood+  log(800*0.39894228*(TMath::Exp(-0.5*((xwerte[i]-x[0])*(xwerte[i]-x[0]))/(x[1]*x[1]) ))/x[1]);
   //  LogLikelihoodfunktion als Summe aller Einzelfunktionswerte der Zufallsvariablen xwert[0]=M
  
   }
@@ -774,7 +810,7 @@ Double_t likelihoodxy(const Double_t *x){
 
        //xwerte[i] enthält den Wert M für Event i
  
-  Likelihood=Likelihood-  log(700*0.39894228*(TMath::Exp(-0.5*((xwerte[i]-x[0])*(xwerte[i]-x[0]))/(x[1]*x[1]) ))/x[1]);
+  Likelihood=Likelihood-  log(800*0.39894228*(TMath::Exp(-0.5*((xwerte[i]-x[0])*(xwerte[i]-x[0]))/(x[1]*x[1]) ))/x[1]);
   //  LogLikelihoodfunktion als Summe aller Einzelfunktionswerte der Zufallsvariablen xwert[0]=M
  
   }
@@ -838,4 +874,141 @@ double Rastrigin01(const Double_t *x){
     double f;
     f= 20.0 + x[0]*x[0] - 10.0*cos(2*3.14159265359*x[0]) + x[1]*x[1] - 10.0*cos(2*3.14159265359*x[1]);
     return f;
+}
+
+
+
+
+
+int NumericalMinimization()
+{
+   ROOT::Math::GSLSimAnMinimizer min;
+ 
+   min.SetMaxFunctionCalls(1000000);
+   min.SetMaxIterations(100000);
+   min.SetTolerance(0.001);
+ 
+   ROOT::Math::Functor f(&likelihoodxy,2); 
+   double step[2] = {0.01,0.01};
+   double variable[2] = {85.0,6.0};
+ 
+   min.SetFunction(f);
+ 
+   // Set the free variables to be minimized!
+   min.SetVariable(0,"x",variable[0], step[0]);
+   min.SetVariable(1,"y",variable[1], step[1]);
+ 
+   min.Minimize(); 
+ 
+   const double *xs = min.X();
+   cout<<endl;
+   cout << "GSLSimAnMinimizer:  Minimum: f(" << xs[0] << "," << xs[1] << "): "   << likelihoodxy(xs) << endl;
+   cout << " number of function calls to reach the minimum : "<<min.NCalls()<<endl;
+   cout << "minimizer provides error and error matrix: (0=false or 1=true) "<<min.ProvidesError()<<endl;
+   cout << " Errors: "<<min.Errors()<<endl;
+ 
+   return 0;
+}
+
+
+int NumericalMinimization2()
+{
+
+    // Choose method upon creation between:
+   // kConjugateFR, kConjugatePR, kVectorBFGS,
+   // kVectorBFGS2, kSteepestDescent
+   ROOT::Math::GSLMinimizer min( ROOT::Math::kSteepestDescent );
+ 
+   min.SetMaxFunctionCalls(1000000);
+   min.SetMaxIterations(100000);
+   min.SetTolerance(0.001);
+ 
+   ROOT::Math::Functor f(&likelihoodxy,2); 
+   double step[2] = {0.01,0.01};
+   double variable[2] = {85.0,6.0};
+ 
+   min.SetFunction(f);
+ 
+   // Set the free variables to be minimized!
+   min.SetVariable(0,"x",variable[0], step[0]);
+   min.SetVariable(1,"y",variable[1], step[1]);
+ 
+   min.Minimize(); 
+ 
+   const double *xs = min.X();
+   cout<<endl;
+   cout << "GSLMinimizer_kSteepestDescent :  Minimum: f(" << xs[0] << "," << xs[1] << "): "  << likelihoodxy(xs) << endl;
+   cout << "number of function calls to reach the minimum :"<<min.NCalls()<<endl;
+   cout << "minimizer provides error and error matrix: (0=false or 1=true) "<<min.ProvidesError()<<endl;
+   cout << "min.Errors: "<<min.Errors()<<endl;
+ 
+   return 0;
+}
+
+int NumericalMinimization3()
+{
+
+    // Choose method upon creation between:
+   // kConjugateFR, kConjugatePR, kVectorBFGS,
+   // kVectorBFGS2, kSteepestDescent
+   ROOT::Math::GSLMinimizer min( ROOT::Math::kConjugateFR );
+ 
+   min.SetMaxFunctionCalls(1000000);
+   min.SetMaxIterations(100000);
+   min.SetTolerance(0.001);
+ 
+   ROOT::Math::Functor f(&likelihoodxy,2); 
+   double step[2] = {0.01,0.01};
+   double variable[2] = {85.0,6.0};
+ 
+   min.SetFunction(f);
+ 
+   // Set the free variables to be minimized!
+   min.SetVariable(0,"x",variable[0], step[0]);
+   min.SetVariable(1,"y",variable[1], step[1]);
+ 
+   min.Minimize(); 
+ 
+   const double *xs = min.X();
+   cout<<endl;
+   cout << "GSLMinimizer_kConjugateFR :  Minimum: f(" << xs[0] << "," << xs[1] << "): "  << likelihoodxy(xs) << endl;
+   cout << "number of function calls to reach the minimum :"<<min.NCalls()<<endl;
+   cout << "minimizer provides error and error matrix: (0=false or 1=true) "<<min.ProvidesError()<<endl;
+   cout << "min.Errors: "<<min.Errors()<<endl;
+ 
+   return 0;
+}
+
+int NumericalMinimization4()
+{
+
+    // Choose method upon creation between:
+   // kConjugateFR, kConjugatePR, kVectorBFGS,
+   // kVectorBFGS2, kSteepestDescent
+   ROOT::Math::GSLMinimizer min( ROOT::Math::kConjugatePR );
+ 
+   min.SetMaxFunctionCalls(1000000);
+   min.SetMaxIterations(100000);
+   min.SetTolerance(0.001);
+ 
+   ROOT::Math::Functor f(&likelihoodxy,2); 
+   double step[2] = {0.01,0.01};
+   double variable[2] = {85.0,6.0};
+ 
+   min.SetFunction(f);
+ 
+   // Set the free variables to be minimized!
+   min.SetVariable(0,"x",variable[0], step[0]);
+   min.SetVariable(1,"y",variable[1], step[1]);
+ 
+   min.Minimize(); 
+ 
+   const double *xs = min.X();
+   cout<<endl;
+   cout << "GSLMinimizer_kConjugatePR :  Minimum: f(" << xs[0] << "," << xs[1] << "): "  << likelihoodxy(xs) << endl;
+   cout << "number of function calls to reach the minimum :"<<min.NCalls()<<endl;
+   cout << "minimizer provides error and error matrix: (0=false or 1=true) "<<min.ProvidesError()<<endl;
+   cout << "min.Errors: "<<min.Errors()<<endl;
+ 
+   return 0;
 }
