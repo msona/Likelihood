@@ -88,6 +88,15 @@ int NumericalMinimization2();
 int NumericalMinimization3();
 int NumericalMinimization4();
 
+
+Double_t breitwigner(Double_t* x, Double_t* par);
+Double_t breitwigner2(const Double_t* x,const Double_t* par);
+Double_t likelihoodBreitWigner(const Double_t *x);
+
+// Breit-Wigner-Funktion im Format für Minuit2  (par[0] und par[1] )
+Double_t likelihoodBreitWignerMinus(const Double_t *x);
+Double_t breitwignerMinuit2(const Double_t *x, const Double_t *par);
+
 //globale Variablen (damit bei Funktionsaufrufen nicht weitere Parameterübergaben nötig sind)
 int AnzahlEvents=0;
 Double_t xwerte[7000];
@@ -121,10 +130,10 @@ int main(int argc, char **argv)
    //pathName.ReplaceAll("/./","/");
 
    //Einlesen und konvertieren von *.csv Datei nach *.root
-   TFile *f = new TFile("Ergebnisse/dielectron100k.root","RECREATE");
+   TFile *f = new TFile("Ergebnisse/Zmumu.root","RECREATE");
    TTree *tree = new TTree("ntuple","Daten aus einer *.csv Datei");
    //tree->ReadFile("dielectron100k.csv","Type/C:Run/D:Event/D:E1/D:px1/D:py1/D:pz1/D:pt1/D:eta1/D:phi1/D:Q1/D:E2/D:px2/D:py2/D:pz2/D:pt2/D:eta2/D:phi2/D:Q2/D:M/D",',');
-   tree->ReadFile("Daten/dielectron100k.csv","Run/D:Event/D:E1/D:px1/D:py1/D:pz1/D:pt1/D:eta1/D:phi1/D:Q1/D:E2/D:px2/D:py2/D:pz2/D:pt2/D:eta2/D:phi2/D:Q2/D:M/D",',');
+   tree->ReadFile("Daten/Zmumu.csv","Type/C:Run/D:Event/D:E1/D:px1/D:py1/D:pz1/D:pt1/D:eta1/D:phi1/D:Q1/D:E2/D:px2/D:py2/D:pz2/D:pt2/D:eta2/D:phi2/D:Q2/D:M/D",',');
    
    f->Write();
   
@@ -275,7 +284,7 @@ t1.Write();
    
 
 //Beginn: Versuche aus pp->ee durch Cuts die Z0 Events herauszufiltern:
-  TH1F *hMasseCut   = new TH1F("hMasseCut"," pp->ee Masse M fuer Cut: pt1>20GeV pt2>20GeV und M>75GeV ",1000,0,130);
+  TH1F *hMasseCut   = new TH1F("hMasseCut","  Masse M fuer Cut: pt1>20GeV pt2>20GeV und M>75GeV ",1000,0,130);
    hMasseCut->GetXaxis()->SetTitle(" M in GeV");
    hMasseCut->GetYaxis()->SetTitle(" Anzahl Ereignisse");
    hMasseCut->GetXaxis()->SetLabelSize(0.02);   // Größe der Zahlen des Histogramms
@@ -283,7 +292,17 @@ t1.Write();
    hMasseCut->GetXaxis()->CenterTitle();  //Achsentitel in die Mitte der Achse legen
    hMasseCut->GetYaxis()->CenterTitle();  //Achsentitel in die Mitte der Achse legen   
    hMasseCut->SetLineColor(kBlue);
-   //hMasseCut->SetFillColor(kRed);
+   hMasseCut->SetFillColor(kBlue);
+   
+   TH1F *hMasseCut2   = new TH1F("hMasseCut2"," pp->ee Masse M fuer Cut: pt1>20GeV pt2>20GeV und M>75GeV ",1000,0,130);
+   hMasseCut2->GetXaxis()->SetTitle(" M in GeV");
+   hMasseCut2->GetYaxis()->SetTitle(" Anzahl Ereignisse");
+   hMasseCut2->GetXaxis()->SetLabelSize(0.02);   // Größe der Zahlen des Histogramms
+   hMasseCut2->GetYaxis()->SetLabelSize(0.02);   // Größe der Zahlen des Histogramms
+   hMasseCut2->GetXaxis()->CenterTitle();  //Achsentitel in die Mitte der Achse legen
+   hMasseCut2->GetYaxis()->CenterTitle();  //Achsentitel in die Mitte der Achse legen   
+   hMasseCut2->SetLineColor(kBlue);
+   hMasseCut2->SetFillColor(kBlue);
    
   TH1F *hPt1Cut   = new TH1F("hPt1Cut"," Pt1 nach Cut: pt1>20GeV und pt2>20GeV ",1000,0,130);
    hPt1Cut->GetXaxis()->SetTitle(" Pt1 in GeV");
@@ -319,6 +338,7 @@ t1.Write();
       //if(pt2>20&&pt1>20&&E1>20&&E2>20){    // 6675 Events erfüllen diese Bedingung, Massenpeak ist sehr deutlich bei 90 GeV
         if(pt2>20&&pt1>20&&M>75){      // 6675 Events erfüllen diese Bedingung, Massenpeak ist sehr deutlich bei 90 GeV
        hMasseCut->Fill(M);
+       hMasseCut2->Fill(M);
        hPt1Cut->Fill(pt1);
       }else{//hMasseCutBackground->Fill(M);}
       }
@@ -368,7 +388,7 @@ t1.Write();
           }
       
       
-            if( (!(pt2>20&&pt1>20&&M>80)) && !(M>2.0&&M<5.16&&pt1>2.9&&pt1<19.72&&pt2>2.9&&pt2<19.72)  ){
+            if( (!(pt2>20&&pt1>20&&M>75)) && !(M>2.0&&M<5.16&&pt1>2.9&&pt1<19.72&&pt2>2.9&&pt2<19.72)  ){
       hMasseCutJpsiBackground->Fill(M);    
       }
 
@@ -521,8 +541,8 @@ t1.Write();
   }
 
 //Setze Anfangswerte der Parameter par[1] und par[2]:
-double par1=86.0;
-double par2=6.0;
+double par1=15.0;
+double par2=85.0;
 par[1]=par1;
 par[2]=par2;
 
@@ -540,23 +560,24 @@ par[2]=par2;
 
 
 // erster Teil der Maximierung (Intervallhalbierungsverfahren/Gittersuchmethode): feines Gitter (damit wird das Finden von Nebenmaxima vermieden) ---------------------------------------------------------
-double intervallgroesse=5.0;
+double intervallgroesse=14.0;
     
 for(int n=0;n<1;n++){  //Schleife: für jedes n wird ein noch kleineres Intervall gewählt
 
 // 2 for Schleifen für die 2 Parameter der Wahrscheinlichkeitsdichtefunktion gauss(x,par)   
-for (double j2=-intervallgroesse; j2<intervallgroesse; j2=j2+intervallgroesse/2) {     
+for (double j2=-intervallgroesse; j2<intervallgroesse; j2=j2+intervallgroesse/10) {     
    if(Likelihood>MaxLikelihood1){     MaxLikelihood1=Likelihood;parameter1=par[1];parameter2=par[2];}   
    par[2] = j2+par2;
-for (double j=-intervallgroesse; j<intervallgroesse; j=j+intervallgroesse/2) {  
+for (double j=-intervallgroesse; j<intervallgroesse; j=j+intervallgroesse/10) {  
     if(Likelihood>MaxLikelihood1){     MaxLikelihood1=Likelihood;parameter1=par[1];parameter2=par[2];}
     //Likelihood für verschiedene Parameterwerte auswerten:
     par[1] = j+par1;
     Likelihood=0.0;
     
   // Schleife über alle Events für den Likelihood-Fit
-  Likelihood=likelihood(par,par);
+  //Likelihood=likelihood(par,par);
   //  Likelihood= -Rastrigin12(par,par);
+    Likelihood = likelihoodBreitWigner(par);
   
    counter++;
 cout << "  Parameter "<<par[1]<<" "<<par[2]<<" Likelihoodfunktion= "<<  Likelihood<<" Anzahl Funktionsauswertungen "<< counter<<endl;
@@ -571,7 +592,7 @@ par1=parameter1;
 }
 
 //zweiter Teil Maximierung: verkleinere die Gitterseitenlänge um Faktor 1/2 und wähle gröberen Abtastschritt als in erstem Teil
-for(int n=0;n<15;n++){  //Schleife: für jedes n wird ein noch kleineres Intervall gewählt
+for(int n=0;n<20;n++){  //Schleife: für jedes n wird ein noch kleineres Intervall gewählt
 
 // 2 for Schleifen für die 2 Parameter der Wahrscheinlichkeitsdichtefunktion gauss(x,par)   
 for (double j2=-intervallgroesse; j2<intervallgroesse; j2=j2+intervallgroesse/2) {     
@@ -584,8 +605,9 @@ for (double j=-intervallgroesse; j<intervallgroesse; j=j+intervallgroesse/2) {
     Likelihood=0.0;
     
   // Schleife über alle Events für den Likelihood-Fit
-  Likelihood=likelihood(par,par);
+  //Likelihood=likelihood(par,par);
   //  Likelihood= -Rastrigin12(par,par);
+   Likelihood = likelihoodBreitWigner(par);
   
    counter++;
 cout << "  Parameter "<<par[1]<<" "<<par[2]<<" Likelihoodfunktion= "<<  Likelihood<<" Anzahl Funktionsauswertungen "<< counter<<endl;
@@ -604,7 +626,7 @@ par1=parameter1;
 
 cout << endl;
 cout << endl;
-cout << " eigene Gittersuchmethode: Minimum der LogLikelihoodfunktion gefunden fuer Parameter "<<" p1= "<<parameter1<<" p2= "<<parameter2<<"  Likelihoodfunktion= "<<  MaxLikelihood1<<endl;;
+cout << " eigene Gittersuchmethode: Minimum der LogLikelihoodfunktion gefunden fuer Parameter "<<" p1=Gamma= "<<parameter1<<" p2=M= "<<parameter2<<"  Likelihoodfunktion= "<<  MaxLikelihood1<<endl;;
 cout<< "  Anzahl Funktionsauswertungen bis das Minimum erreicht ist :"<<counter<<endl;
 
 //cout << " GetMean =  "<< hMasseCut->GetMean()<<" GetRMS = " <<hMasseCut->GetRMS()<< "  Anzahl Events: "<< AnzahlEvents <<endl;
@@ -625,10 +647,10 @@ min.SetMaxFunctionCalls(1000000);
    min.SetMaxIterations(100000);
    min.SetTolerance(0.001);
    
-ROOT::Math::Functor f5(&likelihoodxy,2); //Minuit2 findet hier das richtige Minimum
+ROOT::Math::Functor f5(&likelihoodBreitWignerMinus,2); //Minuit2 findet hier das richtige Minimum
 //   ROOT::Math::Functor f5(&Rastrigin01,2);  // Minuit2 findet nicht das richtige Minimum
    double step[2] = {0.01,0.01};
-   double variable[2] = {80.0,6.0};
+   double variable[2] = {15.0,85.0};
  
    min.SetFunction(f5);
  
@@ -640,7 +662,7 @@ ROOT::Math::Functor f5(&likelihoodxy,2); //Minuit2 findet hier das richtige Mini
    min.Minimize(); 
  
    const double *xs = min.X();
-   cout << "---Minuit2:  Minimum: f(" << xs[0] << "," << xs[1] << ")  =   " << likelihoodxy(xs) << endl << endl<<endl;
+   cout << "---Minuit2:  Minimum: f( Gamma=" << xs[0] << ", M=" << xs[1] << ")  =   " << likelihoodBreitWignerMinus(xs) << endl << endl<<endl;
    
    cout<< "Minuit2 Hesse():  "<<min.Hesse()<<endl;
    
@@ -657,11 +679,8 @@ ROOT::Math::Functor f5(&likelihoodxy,2); //Minuit2 findet hier das richtige Mini
    
 //     cout << "   Minuit2:  Minimum: f(" << xs[0] << "," << xs[1] << ")  =   " << Rastrigin01(xs) << endl << endl<<endl;   
 
-//Minuit1:
-
-  
-//TMinuit *gMinuit = new TMinuit(2);  //initialize TMinuit with a maximum of 2 params
-//TMinuit minuit(2);
+//--------------------------------------------------------------------------
+   
 
    
 // Beginn-Minimierung per Root (GSLMinimizer)-------------------------------------------------------------------
@@ -696,13 +715,13 @@ ROOT::Math::Functor f5(&likelihoodxy,2); //Minuit2 findet hier das richtige Mini
 
 // Ende GSLMinimizer-Minimierung-------------------------------------------------------------------
 //   
-NumericalMinimization();   
+//NumericalMinimization();   
 
-NumericalMinimization2();
+//NumericalMinimization2();
 
-NumericalMinimization3();
+//NumericalMinimization3();
 
-NumericalMinimization4();
+//NumericalMinimization4();
 //-----------------------------------------------------------------------------------------   
 
 par[1]=parameter1;
@@ -721,10 +740,38 @@ par[1]=parameter1;
 par[2]=parameter2;
 
 
+// BreitWigner Fitten an Z0 Peak
+
+
+
    TF1 *gauss1 = new TF1("gauss1",gauss,0,150,3);
    gauss1->SetParameters(500,parameter1,parameter2);
    gauss1->SetParNames ("Constant","Mean_value","Sigma");
    gauss1->Write();
+   
+   TF1 *bw = new TF1("breitwigner3",breitwigner2,0,130,3);
+   bw->SetParameters(50.0,parameter1,parameter2);
+   bw->SetParNames ("Normierungskonstante","Gamma","M");
+   
+   
+   hMasseCut->Fit("breitwigner3","L");
+   bw->Write();  
+   hMasseCut->Write();
+   
+TCanvas *cMasseCutBreitWigner = new TCanvas("cMasseCutBreitWigner","c1",1600,1000);
+hMasseCut->Draw();
+bw->Draw("same");
+cMasseCutBreitWigner->SaveAs("cMasseCutBreitWigner.jpg");
+cMasseCutBreitWigner->Write();   
+   
+   
+   
+   
+   //hMasseCut2->Fit("breitwigner3");
+   hMasseCut2->Write();
+   
+   //hMasseCut->Fit("gauss1","L");
+   
    
    TF2 *f2 = new TF2("f2",Rastrigin,-5,5,-5,5,2);
    f2->Write();
@@ -775,6 +822,90 @@ Double_t gauss(Double_t *x,Double_t *par){
       Double_t fitval = 800*0.39894228*(TMath::Exp(-0.5*((x[0]-par[1])*(x[0]-par[1]))/(par[2]*par[2]) ))/par[2];
       return fitval;
    }  
+   
+   
+//relativistische Breit-Wigner-Formel:
+
+Double_t breitwigner(Double_t* x, Double_t* par)
+{
+  Double_t arg1 = 14.0/22.0; // 2 over pi
+  Double_t arg2 = par[1]*par[1]*par[2]*par[2]; //Gamma=par[1]  M=par[2]
+  Double_t arg3 = ((x[0]*x[0]) - (par[2]*par[2]))*((x[0]*x[0]) - (par[2]*par[2]));
+  Double_t arg4 = x[0]*x[0]*x[0]*x[0]*((par[1]*par[1])/(par[2]*par[2]));
+  return par[0]*arg1*arg2/(arg3 + arg4);
+}
+
+Double_t breitwigner2(const Double_t *x, const Double_t *par)
+{
+  double f;
+  double gamma,M,E,k,g; //1/2pi =0,159154943
+  E=x[0];
+  gamma=par[1];
+  M=par[2];
+   //f= gamma/( 0,159154943*(E-M)*(E-M)+ gamma*gamma/4);  (liefert die falsche Funktion)
+  //https://en.wikipedia.org/wiki/Relativistic_Breit%E2%80%93Wigner_distribution:   (liefert die richtige BreitWigner Funktion)
+  // This equation is written using natural units, ? = c = 1
+  g=sqrt(M*M*(M*M+gamma*gamma));
+  k=2*sqrt(2)*M*gamma*g/(3.141592654*sqrt(M*M+g));
+  
+  f=400*k/( (E*E -M*M)*(E*E -M*M) +M*M*gamma*gamma);
+  
+  return f;
+}
+
+Double_t breitwignerMinuit2(const Double_t *x, const Double_t *par)
+{
+  double f;
+  double gamma,M,E,k,g; //1/2pi =0,159154943
+  E=x[0];
+  gamma=par[0];
+  M=par[1];
+   //f= gamma/( 0,159154943*(E-M)*(E-M)+ gamma*gamma/4);  (liefert die falsche Funktion)
+  //https://en.wikipedia.org/wiki/Relativistic_Breit%E2%80%93Wigner_distribution:   (liefert die richtige BreitWigner Funktion)
+  g=sqrt(M*M*(M*M+gamma*gamma));
+  k=2*sqrt(2)*M*gamma*g/(3.141592654*sqrt(M*M+g));
+  
+  f=300*k/( (E*E -M*M)*(E*E -M*M) +M*M*gamma*gamma);
+  
+  return f;
+}
+ 
+   
+Double_t likelihoodBreitWigner(const Double_t *x){
+    Double_t Likelihood=0.0;
+    double xwert[2];
+    
+
+  for (Int_t i=0; i<AnzahlEvents; i++) {  //6675 ist die Anzahl an Z0-Events
+
+       //xwerte[i] enthält den Wert M für Event i
+       xwert[0]=xwerte[i];
+  Likelihood=Likelihood +  log(breitwigner2(xwert,x));//x sind hier die beiden Fitparameter
+  //  LogLikelihoodfunktion als Summe aller Einzelfunktionswerte der Zufallsvariablen xwert[0]=M
+ 
+  }
+  return Likelihood;
+}
+
+Double_t likelihoodBreitWignerMinus(const Double_t *x){
+    Double_t Likelihood=0.0;
+    double xwert[2];
+    
+
+  for (Int_t i=0; i<AnzahlEvents; i++) {  //6675 ist die Anzahl an Z0-Events
+
+       //xwerte[i] enthält den Wert M für Event i
+       xwert[0]=xwerte[i];
+  Likelihood=Likelihood -  log(breitwignerMinuit2(xwert,x));//x sind hier die beiden Fitparameter
+  //  LogLikelihoodfunktion als Summe aller Einzelfunktionswerte der Zufallsvariablen xwert[0]=M
+ 
+  }
+  return Likelihood;
+}
+   
+   
+   
+   
 // Funktion berechnet die Log-Likelihood-Funktion mit *x==Array der x-Werte;*par==Parameter für Optimierung
 // Achtung: x ist hier eigentlich der(die) Parameter
 Double_t likelihood(Double_t *x,Double_t *par){
