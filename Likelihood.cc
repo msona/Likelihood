@@ -761,7 +761,7 @@ func->SetParameters(788.1,5.543,90.56);
 double random0,random1;
 
 // Histogramm mit Breit-Wigner verteilten Zufallszahlen füllen:
-  for (Int_t i=0; i<58680; i++) {
+  for (Int_t i=0; i<5868; i++) {
   //random0 = r0->Rndm(i);
   random0 = func->GetRandom();
   
@@ -769,8 +769,8 @@ double random0,random1;
   }
 
 
-hMasseRandom2->Fit("breitwignerRoot","IL");
-hMasseRandom2->Write();
+//hMasseRandom2->Fit("breitwignerRoot","IL");
+//hMasseRandom2->Write();
 
 TCanvas *crandom2 = new TCanvas("crandom2","c1",1600,1000);
 hMasseRandom2->Draw();
@@ -785,7 +785,7 @@ crandom2->SaveAs("Histogramme/hMasseRandom2_nurBreitWigner.jpg");
   
   
 // Histogramm mit gaussverteilten Zufallszahlen füllen:  
-    for (Int_t i=0; i<58680; i++) {
+    for (Int_t i=0; i<5868; i++) {
      // Mean=90.6378 Sigma=4.54337
      random1 = r0->Gaus(90.6378,4.54337);
      hMasseRandom->Fill(random1);
@@ -794,7 +794,7 @@ crandom2->SaveAs("Histogramme/hMasseRandom2_nurBreitWigner.jpg");
   
 func->SetParameters(788.1,2.49,90.56);   //Die Funktion "func" ist die BreitWigner-Verteilung
   // Histogramm mit Voigtfunktion- verteilten Zufallszahlen füllen:  
-   for (Int_t i=0; i<58680; i++) {
+   for (Int_t i=0; i<5868; i++) {
      random0 = func->GetRandom();
      random1 = r0->Gaus(0,3.0585);
      
@@ -806,28 +806,35 @@ func->SetParameters(788.1,2.49,90.56);   //Die Funktion "func" ist die BreitWign
   //Voigtfunktion:
 TF1 *voigt1 = new TF1("voigt1",breitgaus, 0, 130 ,4);
 //voigt1->SetParameters(2.49,90.56,826.1,3.578);
-voigt1->SetParameters(2.49,90.56,826.1,9.266);
+voigt1->SetParameters(2.49,90.56,826.1,5.0);
 voigt1->SetParNames ("Gamma","Mz","Normierungskonstante","sigma"); 
 voigt1->Write();  
   
   func3->SetParameters(788.0,2.49,90.56,3.0585);
-       for (Int_t i=0; i<5868; i++) {
+       for (Int_t i=0; i<586800; i++) {
      
      random1 = voigt1->GetRandom();
      hMasseRandomVoigt->Fill(random1);
   }
-
   
   
 
+ TF1 * gaus1 = new TF1("gauss", "[0] / sqrt(2.0 * TMath::Pi()) / [2] * exp(-(x-[1])*(x-[1])/2./[2]/[2])", 0, 100);
+  
+  
+hMasseRandom2->Fit("voigt1","IL");
+hMasseRandom2->Write();
 
 //gStyle->SetOptFit(1111);  
 hMasseRandom3->Fit("voigt1","IL");
 hMasseRandomVoigt->Fit("voigt1","IL");
   hMasseRandomVoigt->Write();
+  
+  vfit->Write();
 
 
-hMasseRandom->Fit("breitwignerRoot","IL");
+//hMasseRandom->Fit("breitwignerRoot","IL");
+  hMasseRandom->Fit("vfit1","IL");
 
 cout << " Fit der Voigtfunktion (also Faltung BreitWigner mit Gauss) an den echten Z0-Peak: "<<endl;
 //hMasseCut2->Fit("breitwignerRootGaus1","IL");
@@ -869,6 +876,9 @@ hMasseRandomVoigt->Chi2Test(hMasseRandom3,"UW P ",res);
 // Chi-Quadrat-Test zwischen Histogramm und Funktion:
 cout << endl<<" Chisqare-Test  Z-Peak mit Voigt : "<<hMasseCut->Chisquare(voigt1)<<endl;
 cout << endl<<" Chisqare-Test  Z-Peak mit Breit-Wigner : "<<hMasseCut->Chisquare(func)<<endl;
+cout << endl<<" Chisqare-Test  Z-Peak mit Breit-Wigner : "<<hMasseCut->Chisquare(gaus1)<<endl;
+
+
 
 // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
    //hMasseCut->Fit("breitwigner3","L");
