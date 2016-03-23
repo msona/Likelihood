@@ -108,13 +108,13 @@ int NumericalMinimization3();
 int NumericalMinimization4();
 
 
-Double_t breitwigner(Double_t* x, Double_t* par);
+
 Double_t breitwigner2(const Double_t* x,const Double_t* par);
 Double_t breitwignerRoot(const Double_t *x, const Double_t *par);
 Double_t breitwignerRoot2(const Double_t *x, const Double_t *par);
 
 Double_t breitwignerRootGaus(const Double_t *x, const Double_t *par);
-Double_t breitgausfun(Double_t *x, Double_t *par);
+Double_t breitgaus(Double_t *x, Double_t *par);
 
 
 Double_t likelihoodBreitWigner(const Double_t *x);
@@ -129,56 +129,51 @@ int AnzahlEvents=0;
 Double_t xwerte[7000];
 Double_t xwert [1] = {0.0};
 
-// Beginn der Main-Funktion
+
+
+// Beginn der Main-Funktion  *******************************************************************************************************************************************
+
+//    ******************************************************************************************************************************************************************
 int main(int argc, char **argv)
 {
 
-  if(argc!=2)
-  {
-    cout << "program needs one argument" << endl;
-    return 1;
-  }
 
-  TStopwatch sw;
-  ROOT::Cintex::Cintex::Enable();
-
-  TString pathName;
-
-  pathName="/home/nebus/blatt1/";    // arbeite lokal auf x230 Laptop
-  pathName+=argv[1];
-
+//# Einlesen der *.csv Datei dielectron100k.csv mit TTree->Readfile und schreiben in Rootfile f (Ergebnisse/dielectron100k.root) per TFile->Write   ******************************************************
   
-  //# Einlesen der *.csv Datei Zee.csv mit TFile->Write und TTree->Readfile #########################################################
-  
-  
-   TString dir = gSystem->UnixPathName(__FILE__);
-   cout << "   Dateiname zum Einlesen : " << gSystem->UnixPathName(__FILE__) << "   ";
-   //pathName.ReplaceAll("UScsvToRoot.C","");
-   //pathName.ReplaceAll("/./","/");
-
    //Einlesen und konvertieren von *.csv Datei nach *.root
    TFile *f = new TFile("Ergebnisse/dielectron100k.root","RECREATE");
    TTree *tree = new TTree("ntuple","Daten aus einer *.csv Datei");
-   //tree->ReadFile("dielectron100k.csv","Type/C:Run/D:Event/D:E1/D:px1/D:py1/D:pz1/D:pt1/D:eta1/D:phi1/D:Q1/D:E2/D:px2/D:py2/D:pz2/D:pt2/D:eta2/D:phi2/D:Q2/D:M/D",',');
+   //tree->ReadFile("dielectron100k.csv","Type/C:Run/D:Event/D:E1/D:px1/D:py1/D:pz1/D:pt1/D:eta1/D:phi1/D:Q1/D:E2/D:px2/D:py2/D:pz2/D:pt2/D:eta2/D:phi2/D:Q2/D:M/D",',');  
+   //Hinweis: für dielectron100k.csv entfällt "Type/C:" weil es diese Spalte in der Datei nicht gibt; Für die anderen Event-Files muss Type/C: angegeben werden.
    tree->ReadFile("Daten/dielectron100k.csv","Run/D:Event/D:E1/D:px1/D:py1/D:pz1/D:pt1/D:eta1/D:phi1/D:Q1/D:E2/D:px2/D:py2/D:pz2/D:pt2/D:eta2/D:phi2/D:Q2/D:M/D",',');
-   
    f->Write();
-  
-   double_t px1, py1, pz1,pt1,M, E1,E2,pt2;
+   Int_t nentries = (Int_t)tree->GetEntries();
+   Int_t AnzahlEreignisse = (Int_t)tree->GetEntries();
+// Ende Einlesen der Daten ************************************************************************************************************************************************   
+
    
-  TH1F *hM   = new TH1F("hM","M Masse distribution",100,-3,3);
+   
+   
+// Erzeugen einer zweiten Datei "tree1.root"; Dort werden die weiter unten erstellten Histogramme gespeichert. Die Datei "dielectron100k.root" enthält lediglich die Daten aus der *.csv-Datei.
+  TFile f1("Ergebnisse/tree1.root","recreate");
+  TTree t1("t1","a simple Tree with simple variables");
+   
+   
+// Erstellen von Histogrammen aus den Daten, die sich jetzt im Tree "tree" befinden****************************************************************************************   
+   double_t px1, py1, pz1,pt1,M, E1,E2,pt2,phi1,phi2,Ht;
+   
+  TH1F *hM   = new TH1F("hM","M Masse distribution",400,0,115);
   TH2F *hpxpy = new TH2F("hpxpy","py vs px",30,-3,3,30,-3,3);
-  
-  
   hpxpy->GetXaxis()->SetTitle(" x-Achse hat den Titel: px1 in GeV");
   hpxpy->GetYaxis()->SetTitle(" y-Achse hat den Titel: py1 in GeV");
   
   
-  Int_t nentries = (Int_t)tree->GetEntries(); 
+  
    
   tree->SetBranchAddress("pt1",&pt1);   //Setze die Einzulesende Variable pt1 für tree->GetEntry(i) 
- for (Int_t i = 0; i<nentries; i++) {
+ for (Int_t i = 0; i<AnzahlEreignisse; i++) {
  tree->GetEntry(i); // Code läuft durch Compiler mit tree->GetEntry
+ //hM->Fill(M);
  //cout << " pt1: " << pt1 << " px1: "<<px1;
  }
    
@@ -186,7 +181,8 @@ int main(int argc, char **argv)
   tree->SetBranchAddress("py1",&py1);
    tree->SetBranchAddress("pz1",&pz1);
     tree->SetBranchAddress("M",&M);
-  for (Int_t i = 0; i<nentries; i++) {
+  
+    for (Int_t i = 0; i<AnzahlEreignisse; i++) {
  tree->GetEntry(i); // Code läuft durch Compiler mit tree->GetEntry  ; Die Werte von pt1 stimmen mit den echten aus den Daten überein!
  
     hM->Fill(M);
@@ -199,7 +195,7 @@ int main(int argc, char **argv)
  
  // Kopieren der Variable M aus dem Tree tree nach Tree "t1" mit Variable "M1"  funktioniert, die neue Datei heisst tree1.root
  // Bauen eines neuen Trees t1 mit neuen Variablen, die aus den Variablen des alten Trees aus Zmumu.root zusammengesetzt sind
- double_t phi1,phi2,Ht;
+
  
  tree->SetBranchAddress("M",&M);
  tree->SetBranchAddress("E1",&E1);
@@ -210,8 +206,7 @@ int main(int argc, char **argv)
  tree->SetBranchAddress("pt1",&pt1);
  tree->SetBranchAddress("pt2",&pt2);
  
- TFile f1("Ergebnisse/tree1.root","recreate");
- TTree t1("t1","a simple Tree with simple variables");
+
  
  TH1F *hHt   = new TH1F("hHt"," Transversale Impulssumme Ht=pt1+pt2",500,0,310);
    hHt->GetXaxis()->SetTitle(" Transversale Impulssumme Ht = pt1+pt2 in GeV");
@@ -300,6 +295,7 @@ int main(int argc, char **argv)
    }
    
 hpxpy->Write();   // Histogramm hpxpy in die Datei tree1.root schreiben!
+hM->Write();
 hsumE1E2->Write();
 hHt->Write();
 hPt1berechnet->Write();
@@ -311,6 +307,7 @@ t1.Write();
    
 
 //Beginn: Versuche aus pp->ee durch Cuts die Z0 Events herauszufiltern:
+// Die Histogramme hMasseCut und hMasseCut2 enthalten die als Z0-Teilchen selektierten Events; Es sind 2 Histogramme weil an hMasseCut die BreitWignerVerteilung und an hMasseCut2 die Voigtfunktion gefittet wird.
   TH1F *hMasseCut   = new TH1F("hMasseCut","  Masse M fuer Cut: pt1>20GeV pt2>20GeV und 110>M>70GeV ",1000,0,130);
    hMasseCut->GetXaxis()->SetTitle(" M in GeV");
    hMasseCut->GetYaxis()->SetTitle(" Anzahl Ereignisse");
@@ -321,8 +318,18 @@ t1.Write();
    hMasseCut->SetLineColor(kBlue);
    hMasseCut->SetFillColor(kBlue);
    
+   TH1F *hMasseCut2   = new TH1F("hMasseCut2"," pp->ee Masse M fuer Cut: pt1>20GeV pt2>20GeV und 110>M>70GeV ",1000,0,130);
+   hMasseCut2->GetXaxis()->SetTitle(" M in GeV");
+   hMasseCut2->GetYaxis()->SetTitle(" Anzahl Ereignisse");
+   hMasseCut2->GetXaxis()->SetLabelSize(0.02);   // Größe der Zahlen des Histogramms
+   hMasseCut2->GetYaxis()->SetLabelSize(0.02);   // Größe der Zahlen des Histogramms
+   hMasseCut2->GetXaxis()->CenterTitle();  //Achsentitel in die Mitte der Achse legen
+   hMasseCut2->GetYaxis()->CenterTitle();  //Achsentitel in die Mitte der Achse legen   
+   hMasseCut2->SetLineColor(kBlue);
+   hMasseCut2->SetFillColor(kBlue);
    
-   TH1F *hMasseRandom   = new TH1F("hMasseRandom","  Masse M fuer Z0-Peak: Zufallszahlen ",1000,0,130);
+   
+   TH1F *hMasseRandom   = new TH1F("hMasseRandom","  Masse M fuer Z0-Peak: gaussverteilte Zufallszahlen ",1000,0,130);
    hMasseRandom->GetXaxis()->SetTitle(" M in GeV");
    hMasseRandom->GetYaxis()->SetTitle(" Anzahl Ereignisse");
    hMasseRandom->GetXaxis()->SetLabelSize(0.02);   // Größe der Zahlen des Histogramms
@@ -342,7 +349,7 @@ t1.Write();
    hMasseRandom2->SetLineColor(kBlue);
    hMasseRandom2->SetFillColor(kBlue);
    
-      TH1F *hMasseRandom3   = new TH1F("hMasseRandom3","  Masse M fuer Z0-Peak: Zufallszahlen natuerliche Breite als BreitWigner und Detektoreffekte als Gauß ",1000,0,130);
+      TH1F *hMasseRandom3   = new TH1F("hMasseRandom3","  Masse M fuer Z0-Peak: Zufallszahlen natuerliche Breite als BreitWigner und Addition der Detektoreffekte als Gauß ",1000,0,130);
    hMasseRandom3->GetXaxis()->SetTitle(" M in GeV");
    hMasseRandom3->GetYaxis()->SetTitle(" Anzahl Ereignisse");
    hMasseRandom3->GetXaxis()->SetLabelSize(0.02);   // Größe der Zahlen des Histogramms
@@ -351,7 +358,8 @@ t1.Write();
    hMasseRandom3->GetYaxis()->CenterTitle();  //Achsentitel in die Mitte der Achse legen   
    hMasseRandom3->SetLineColor(kBlue);
    hMasseRandom3->SetFillColor(kBlue);
-   
+
+// Das Histogramm hMasseRandomVoigt wird mit Zufallszahlen der Voigtfunktion gefüllt (zum Generieren der Zufallszahlen verwendete Funktion: breitgaus)   
     TH1F *hMasseRandomVoigt   = new TH1F("hMasseRandomVoigt","  Masse M fuer Z0-Peak: Zufallszahlen per Voigtfunktion ",1000,0,130);
    hMasseRandomVoigt->GetXaxis()->SetTitle(" M in GeV");
    hMasseRandomVoigt->GetYaxis()->SetTitle(" Anzahl Ereignisse");
@@ -362,15 +370,7 @@ t1.Write();
    hMasseRandomVoigt->SetLineColor(kBlue);
    hMasseRandomVoigt->SetFillColor(kBlue);
    
-   TH1F *hMasseCut2   = new TH1F("hMasseCut2"," pp->ee Masse M fuer Cut: pt1>20GeV pt2>20GeV und 110>M>70GeV ",1000,0,130);
-   hMasseCut2->GetXaxis()->SetTitle(" M in GeV");
-   hMasseCut2->GetYaxis()->SetTitle(" Anzahl Ereignisse");
-   hMasseCut2->GetXaxis()->SetLabelSize(0.02);   // Größe der Zahlen des Histogramms
-   hMasseCut2->GetYaxis()->SetLabelSize(0.02);   // Größe der Zahlen des Histogramms
-   hMasseCut2->GetXaxis()->CenterTitle();  //Achsentitel in die Mitte der Achse legen
-   hMasseCut2->GetYaxis()->CenterTitle();  //Achsentitel in die Mitte der Achse legen   
-   hMasseCut2->SetLineColor(kBlue);
-   hMasseCut2->SetFillColor(kBlue);
+
    
   TH1F *hPt1Cut   = new TH1F("hPt1Cut"," Pt1 nach Cut: pt1>20GeV und pt2>20GeV ",1000,0,130);
    hPt1Cut->GetXaxis()->SetTitle(" Pt1 in GeV");
@@ -394,7 +394,10 @@ t1.Write();
    hMasseCutBackground->SetLineColor(kYellow);
    hMasseCutBackground->SetFillColor(kYellow);
          
-    double_t MasseCut;
+// Ende: Erstellen/Deklarieren von Histogrammen ****************************************************************************************  
+
+// Beginn: Füllen der Histogramme mit Daten aus dem Tree "tree" ****************************************************************************************    
+   double_t MasseCut;
     
    THStack *hStack = new THStack("hStack","Stacked 1D histograms: Z0 Background (gelb) und Z0 Events (rot); Cut pt1&pt2>20GeV"); // Histogramme aufeinanderlegen
   THStack *hStackJpsi = new THStack("hStackJpsi","Stacked 1D histograms: Background (gelb) und Z0 Events (Z0 rot) und JPsi blau"); // Histogramme aufeinanderlegen
@@ -431,8 +434,10 @@ t1.Write();
    
   
 t1.Write();
+hMasseCut->Write();
 
 
+// Ende: Füllen der Histogramme mit Daten aus dem Tree "tree" ***********************************************************************
 
 //Ende: Versuche aus pp->ee durch Cuts die Z0 Events herauszufiltern. --------------------------------------------------------
    
@@ -458,7 +463,7 @@ t1.Write();
   
 
   
-  hMasseCut->Write();
+  
 
  
   // par[3] ist ein Array mit den 3 Parametern der Gaussfunktion
@@ -635,15 +640,6 @@ ROOT::Math::Functor f5(&likelihoodBreitWignerMinus,2); //Minuit2 findet hier das
 //     cout << "   Minuit2:  Minimum: f(" << xs[0] << "," << xs[1] << ")  =   " << Rastrigin01(xs) << endl << endl<<endl;   
 
 //--------------------------------------------------------------------------
-   
-
-   
-// Beginn-Minimierung per Root (GSLMinimizer)-------------------------------------------------------------------
-
- 
-
-
-// Ende GSLMinimizer-Minimierung-------------------------------------------------------------------
 //   
 //NumericalMinimization();   
 
@@ -690,7 +686,7 @@ gStyle->SetOptStat(1111);
 TCanvas *cMasseCutBreitWigner = new TCanvas("cMasseCutBreitWigner","c1",1600,1000);
 hMasseCut->Draw();
 bw->Draw("same");
-cMasseCutBreitWigner->SaveAs("cMasseCutBreitWigner.jpg");
+cMasseCutBreitWigner->SaveAs("Histogramme/cMasseCutBreitWigner.jpg");
 cMasseCutBreitWigner->Write();   
 
 // Fitten Breit-Wigner an Z0-Peak mit Root ##############################################################################################
@@ -707,7 +703,7 @@ hMasseCut->Fit("breitwignerRoot","IL");
 
 TCanvas *cMasseCutBreitWigner2 = new TCanvas("cMasseCutbreitwignerRoot","c1",1600,1000);
 hMasseCut->Draw();
-cMasseCutBreitWigner2->SaveAs("cMasseCutbreitwignerRootOffsetPlus3.jpg");
+cMasseCutBreitWigner2->SaveAs("Histogramme/cMasseCutbreitwignerRootOffsetPlus3.jpg");
 cMasseCutBreitWigner2->Write(); 
 
 func->Write();
@@ -742,7 +738,7 @@ vfit->Write();
 TCanvas *c9 = new TCanvas("c1","c1",1600,1000);
 hMasseCut2->Draw();
 func3->Draw("same");
-c9->SaveAs("Voigfunktion_und_Z0Massenpeak.jpg");
+c9->SaveAs("Histogramme/Voigfunktion_und_Z0Massenpeak.jpg");
 c9->Write();
 
 
@@ -778,11 +774,12 @@ hMasseRandom2->Write();
 
 TCanvas *crandom2 = new TCanvas("crandom2","c1",1600,1000);
 hMasseRandom2->Draw();
-crandom2->SaveAs("hMasseRandom2_nurBreitWigner.jpg");
+crandom2->SaveAs("Histogramme/hMasseRandom2_nurBreitWigner.jpg");
 
 //func->SetParameters(788.1,2.49,91.18);
-func->SetParameters(788.1,2.49,90.56);
 
+
+  TStopwatch sw;
   gRandom = r0;
   sw.Start();
   
@@ -795,7 +792,8 @@ func->SetParameters(788.1,2.49,90.56);
     
   }
   
-// Histogramm mit Voigtfunktion- verteilten Zufallszahlen füllen:  
+func->SetParameters(788.1,2.49,90.56);   //Die Funktion "func" ist die BreitWigner-Verteilung
+  // Histogramm mit Voigtfunktion- verteilten Zufallszahlen füllen:  
    for (Int_t i=0; i<58680; i++) {
      random0 = func->GetRandom();
      random1 = r0->Gaus(0,3.0585);
@@ -806,21 +804,19 @@ func->SetParameters(788.1,2.49,90.56);
 
 
   //Voigtfunktion:
-TF1 *voigt1 = new TF1("voigt1",breitgausfun, 0, 130 ,4);
-//voigt1->SetParameters(4.067,90.29,2513,9.266);
-voigt1->SetParameters(3.503,90.72,826.1,3.578);
-
- voigt1->SetParNames ("Gamma","Mz","Normierungskonstante","sigma"); 
+TF1 *voigt1 = new TF1("voigt1",breitgaus, 0, 130 ,4);
+//voigt1->SetParameters(2.49,90.56,826.1,3.578);
+voigt1->SetParameters(2.49,90.56,826.1,9.266);
+voigt1->SetParNames ("Gamma","Mz","Normierungskonstante","sigma"); 
 voigt1->Write();  
   
   func3->SetParameters(788.0,2.49,90.56,3.0585);
-       for (Int_t i=0; i<58680; i++) {
+       for (Int_t i=0; i<5868; i++) {
      
      random1 = voigt1->GetRandom();
      hMasseRandomVoigt->Fill(random1);
-    
   }
-  hMasseRandomVoigt->Write();
+
   
   
 
@@ -828,6 +824,8 @@ voigt1->Write();
 //gStyle->SetOptFit(1111);  
 hMasseRandom3->Fit("voigt1","IL");
 hMasseRandomVoigt->Fit("voigt1","IL");
+  hMasseRandomVoigt->Write();
+
 
 hMasseRandom->Fit("breitwignerRoot","IL");
 
@@ -843,10 +841,11 @@ hMasseCut2->Write();
 
 TCanvas *crandom = new TCanvas("crandom","c1",1600,1000);
 hMasseRandom3->Draw();
-crandom->SaveAs("hMasseRandom3_BreitWigner_mit_Gauss.jpg");
+crandom->SaveAs("Histogramme/hMasseRandom3_BreitWigner_mit_Gauss.jpg");
   
 hMasseRandom->Write();  
 hMasseRandom3->Write();  
+hMasseRandom2->Write();
 
 
 Double_t res[1000];
@@ -900,39 +899,39 @@ cout << endl<<" Chisqare-Test  Z-Peak mit Breit-Wigner : "<<hMasseCut->Chisquare
 TCanvas *chMasseCut1 = new TCanvas("c1","c1",1600,1000);
 hMasseCut->Draw();
 gauss1->Draw("same");
-chMasseCut1->SaveAs("CANVASpicture_hMasseCut.jpg");
+chMasseCut1->SaveAs("Histogramme/CANVASpicture_hMasseCut.jpg");
 chMasseCut1->Write();
 
 TCanvas *c3 = new TCanvas("c3","c3",1600,1000);
 Likelihood1->Draw("LEGO");
-c3->SaveAs("CANVASpictureLikelihood.jpg");
+c3->SaveAs("Histogramme/CANVASpictureLikelihood.jpg");
 c3->Write();
 
 TCanvas *c31 = new TCanvas("c31","c31",1600,1000);
 breitwigner4->Draw("LEGO");
-c31->SaveAs("likelihoodBreitWignerMinusDraw.jpg");
+c31->SaveAs("Histogramme/likelihoodBreitWignerMinusDraw.jpg");
 c31->Write();
 
 TCanvas *c4 = new TCanvas("c4","c4",1600,1000);
 f2->Draw("SURF2");         //  Optionen für Draw: LEGO,LEGO2, SURF2
-c4->SaveAs("CANVASpictureRastrigin.jpg");
+c4->SaveAs("Histogramme/CANVASpictureRastrigin.jpg");
 c4->Write();
 
 TCanvas *c6 = new TCanvas("c6","c6",1600,1000);
 f3->Draw("SURF2");         //  Optionen für Draw: LEGO,LEGO2, SURF2
-c6->SaveAs("CANVASpictureRastrigin12.jpg");
+c6->SaveAs("Histogramme/CANVASpictureRastrigin12.jpg");
 c6->Write();
 
 TCanvas *c5 = new TCanvas("c1","c1",1600,1000);
 f3->Draw("LEGO");         //  Optionen für Draw: LEGO,LEGO2, SURF2
-c5->SaveAs("CANVASpictureTF2_2.jpg");
+c5->SaveAs("Histogramme/CANVASpictureTF2_2.jpg");
 c5->Write();
 
   
   
 }
 
-
+// Ende der Main-Funktion ##########################################################################################################################################################
 
 
    // Normalverteilung, normiert auf 1
@@ -945,14 +944,7 @@ Double_t gauss(Double_t *x,Double_t *par){
    
 //relativistische Breit-Wigner-Formel:
 
-Double_t breitwigner(Double_t* x, Double_t* par)
-{
-  Double_t arg1 = 14.0/22.0; // 2 over pi
-  Double_t arg2 = par[1]*par[1]*par[2]*par[2]; //Gamma=par[1]  M=par[2]
-  Double_t arg3 = ((x[0]*x[0]) - (par[2]*par[2]))*((x[0]*x[0]) - (par[2]*par[2]));
-  Double_t arg4 = x[0]*x[0]*x[0]*x[0]*((par[1]*par[1])/(par[2]*par[2]));
-  return par[0]*arg1*arg2/(arg3 + arg4);
-}
+
 
 Double_t breitwigner2(const Double_t *x, const Double_t *par)
 {
@@ -1368,8 +1360,8 @@ int NumericalMinimization4()
    return 0;
 }
 
-/*--------------------------------------------------------------------*/
-Double_t breitgausfun(Double_t *x, Double_t *par) /*--------------------------------------------------------------------*/
+/*  Voigtfunktion  (eine Faltung aus Gauss und Breit-Wigner Verteilung)--------------------------------------------------------------------*/
+Double_t breitgaus(Double_t *x, Double_t *par) /*--------------------------------------------------------------------*/
 {
 
 //Fit parameters:
