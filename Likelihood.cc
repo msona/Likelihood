@@ -63,9 +63,28 @@ Der selbst geschriebene Minimierer wird dann mit dem Minimierer Minuit2 verglich
 #include "Math/GSLMinimizer.h"
 #include "Math/GSLSimAnMinimizer.h"
 
-
+// für Breit-Wigner-Verteilung:
+#include "Math/SpecFuncMathCore.h"
+#include "TStyle.h"
 
 #include "TStopwatch.h"
+
+#include "TMath.h"
+#include "TH1.h"
+#include "TF1.h"
+#include "TROOT.h"
+#include "TStyle.h"
+#include "Math/ProbFuncMathCore.h"
+#include "Math/PdfFuncMathCore.h"
+#include "Math/SpecFuncMathCore.h"
+#include "TError.h"
+
+
+// für Zufallszahlen
+#include <TRandom1.h>
+#include <TRandom2.h>
+#include <TRandom3.h>
+#include <TStopwatch.h>
 
 using namespace std;
 
@@ -91,7 +110,15 @@ int NumericalMinimization4();
 
 Double_t breitwigner(Double_t* x, Double_t* par);
 Double_t breitwigner2(const Double_t* x,const Double_t* par);
+Double_t breitwignerRoot(const Double_t *x, const Double_t *par);
+Double_t breitwignerRoot2(const Double_t *x, const Double_t *par);
+
+Double_t breitwignerRootGaus(const Double_t *x, const Double_t *par);
+Double_t breitgausfun(Double_t *x, Double_t *par);
+
+
 Double_t likelihoodBreitWigner(const Double_t *x);
+Double_t likelihoodBreitWignerMinusDraw(const Double_t *x,const Double_t *par);
 
 // Breit-Wigner-Funktion im Format für Minuit2  (par[0] und par[1] )
 Double_t likelihoodBreitWignerMinus(const Double_t *x);
@@ -130,10 +157,10 @@ int main(int argc, char **argv)
    //pathName.ReplaceAll("/./","/");
 
    //Einlesen und konvertieren von *.csv Datei nach *.root
-   TFile *f = new TFile("Ergebnisse/Zmumu.root","RECREATE");
+   TFile *f = new TFile("Ergebnisse/dielectron100k.root","RECREATE");
    TTree *tree = new TTree("ntuple","Daten aus einer *.csv Datei");
    //tree->ReadFile("dielectron100k.csv","Type/C:Run/D:Event/D:E1/D:px1/D:py1/D:pz1/D:pt1/D:eta1/D:phi1/D:Q1/D:E2/D:px2/D:py2/D:pz2/D:pt2/D:eta2/D:phi2/D:Q2/D:M/D",',');
-   tree->ReadFile("Daten/Zmumu.csv","Type/C:Run/D:Event/D:E1/D:px1/D:py1/D:pz1/D:pt1/D:eta1/D:phi1/D:Q1/D:E2/D:px2/D:py2/D:pz2/D:pt2/D:eta2/D:phi2/D:Q2/D:M/D",',');
+   tree->ReadFile("Daten/dielectron100k.csv","Run/D:Event/D:E1/D:px1/D:py1/D:pz1/D:pt1/D:eta1/D:phi1/D:Q1/D:E2/D:px2/D:py2/D:pz2/D:pt2/D:eta2/D:phi2/D:Q2/D:M/D",',');
    
    f->Write();
   
@@ -230,7 +257,7 @@ int main(int argc, char **argv)
    hPt2->SetLineColor(4);
    hPt2->SetFillColor(4);
    
-  TH1F *hMasse   = new TH1F("hMasse"," Masse M",200,0,115);
+  TH1F *hMasse   = new TH1F("hMasse"," Masse M",400,0,115);
    hMasse->GetXaxis()->SetTitle(" M in GeV");
    hMasse->GetYaxis()->SetTitle(" Anzahl Ereignisse");
    hMasse->GetXaxis()->SetLabelSize(0.02);   // Größe der Zahlen des Histogramms
@@ -284,7 +311,7 @@ t1.Write();
    
 
 //Beginn: Versuche aus pp->ee durch Cuts die Z0 Events herauszufiltern:
-  TH1F *hMasseCut   = new TH1F("hMasseCut","  Masse M fuer Cut: pt1>20GeV pt2>20GeV und M>75GeV ",1000,0,130);
+  TH1F *hMasseCut   = new TH1F("hMasseCut","  Masse M fuer Cut: pt1>20GeV pt2>20GeV und 110>M>70GeV ",1000,0,130);
    hMasseCut->GetXaxis()->SetTitle(" M in GeV");
    hMasseCut->GetYaxis()->SetTitle(" Anzahl Ereignisse");
    hMasseCut->GetXaxis()->SetLabelSize(0.02);   // Größe der Zahlen des Histogramms
@@ -294,7 +321,48 @@ t1.Write();
    hMasseCut->SetLineColor(kBlue);
    hMasseCut->SetFillColor(kBlue);
    
-   TH1F *hMasseCut2   = new TH1F("hMasseCut2"," pp->ee Masse M fuer Cut: pt1>20GeV pt2>20GeV und M>75GeV ",1000,0,130);
+   
+   TH1F *hMasseRandom   = new TH1F("hMasseRandom","  Masse M fuer Z0-Peak: Zufallszahlen ",1000,0,130);
+   hMasseRandom->GetXaxis()->SetTitle(" M in GeV");
+   hMasseRandom->GetYaxis()->SetTitle(" Anzahl Ereignisse");
+   hMasseRandom->GetXaxis()->SetLabelSize(0.02);   // Größe der Zahlen des Histogramms
+   hMasseRandom->GetYaxis()->SetLabelSize(0.02);   // Größe der Zahlen des Histogramms
+   hMasseRandom->GetXaxis()->CenterTitle();  //Achsentitel in die Mitte der Achse legen
+   hMasseRandom->GetYaxis()->CenterTitle();  //Achsentitel in die Mitte der Achse legen   
+   hMasseRandom->SetLineColor(kBlue);
+   hMasseRandom->SetFillColor(kBlue);
+   
+      TH1F *hMasseRandom2   = new TH1F("hMasseRandom2","  simulierter Z0-Peak: Zufallszahlen, BreitWignerVerteilung ",1000,0,130);
+   hMasseRandom2->GetXaxis()->SetTitle(" M in GeV");
+   hMasseRandom2->GetYaxis()->SetTitle(" Anzahl Ereignisse");
+   hMasseRandom2->GetXaxis()->SetLabelSize(0.02);   // Größe der Zahlen des Histogramms
+   hMasseRandom2->GetYaxis()->SetLabelSize(0.02);   // Größe der Zahlen des Histogramms
+   hMasseRandom2->GetXaxis()->CenterTitle();  //Achsentitel in die Mitte der Achse legen
+   hMasseRandom2->GetYaxis()->CenterTitle();  //Achsentitel in die Mitte der Achse legen   
+   hMasseRandom2->SetLineColor(kBlue);
+   hMasseRandom2->SetFillColor(kBlue);
+   
+      TH1F *hMasseRandom3   = new TH1F("hMasseRandom3","  Masse M fuer Z0-Peak: Zufallszahlen natuerliche Breite als BreitWigner und Detektoreffekte als Gauß ",1000,0,130);
+   hMasseRandom3->GetXaxis()->SetTitle(" M in GeV");
+   hMasseRandom3->GetYaxis()->SetTitle(" Anzahl Ereignisse");
+   hMasseRandom3->GetXaxis()->SetLabelSize(0.02);   // Größe der Zahlen des Histogramms
+   hMasseRandom3->GetYaxis()->SetLabelSize(0.02);   // Größe der Zahlen des Histogramms
+   hMasseRandom3->GetXaxis()->CenterTitle();  //Achsentitel in die Mitte der Achse legen
+   hMasseRandom3->GetYaxis()->CenterTitle();  //Achsentitel in die Mitte der Achse legen   
+   hMasseRandom3->SetLineColor(kBlue);
+   hMasseRandom3->SetFillColor(kBlue);
+   
+    TH1F *hMasseRandomVoigt   = new TH1F("hMasseRandomVoigt","  Masse M fuer Z0-Peak: Zufallszahlen per Voigtfunktion ",1000,0,130);
+   hMasseRandomVoigt->GetXaxis()->SetTitle(" M in GeV");
+   hMasseRandomVoigt->GetYaxis()->SetTitle(" Anzahl Ereignisse");
+   hMasseRandomVoigt->GetXaxis()->SetLabelSize(0.02);   // Größe der Zahlen des Histogramms
+   hMasseRandomVoigt->GetYaxis()->SetLabelSize(0.02);   // Größe der Zahlen des Histogramms
+   hMasseRandomVoigt->GetXaxis()->CenterTitle();  //Achsentitel in die Mitte der Achse legen
+   hMasseRandomVoigt->GetYaxis()->CenterTitle();  //Achsentitel in die Mitte der Achse legen   
+   hMasseRandomVoigt->SetLineColor(kBlue);
+   hMasseRandomVoigt->SetFillColor(kBlue);
+   
+   TH1F *hMasseCut2   = new TH1F("hMasseCut2"," pp->ee Masse M fuer Cut: pt1>20GeV pt2>20GeV und 110>M>70GeV ",1000,0,130);
    hMasseCut2->GetXaxis()->SetTitle(" M in GeV");
    hMasseCut2->GetYaxis()->SetTitle(" Anzahl Ereignisse");
    hMasseCut2->GetXaxis()->SetLabelSize(0.02);   // Größe der Zahlen des Histogramms
@@ -336,14 +404,14 @@ t1.Write();
        tree->GetEntry(i);
        
       //if(pt2>20&&pt1>20&&E1>20&&E2>20){    // 6675 Events erfüllen diese Bedingung, Massenpeak ist sehr deutlich bei 90 GeV
-        if(pt2>20&&pt1>20&&M>75){      // 6675 Events erfüllen diese Bedingung, Massenpeak ist sehr deutlich bei 90 GeV
+        if(pt2>20&&pt1>20&&M>70){      // 6675 Events erfüllen diese Bedingung, Massenpeak ist sehr deutlich bei 90 GeV
        hMasseCut->Fill(M);
        hMasseCut2->Fill(M);
        hPt1Cut->Fill(pt1);
       }else{//hMasseCutBackground->Fill(M);}
       }
       
-      if( !(pt2>20&&pt1>20&&M>75)){
+      if( !(pt2>20&&pt1>20&&M>70)){
       hMasseCutBackground->Fill(M);    
       }
    }
@@ -354,119 +422,14 @@ t1.Write();
    
    
    //Beginn: Cuts für das J/Psi
-   TH1F *hMasseCutJpsi   = new TH1F("hMasseCutJpsi"," pp->ee Masse M fuer Cut: Jpsi ",1000,0,130);
-   hMasseCutJpsi->GetXaxis()->SetTitle(" M in GeV");
-   hMasseCutJpsi->GetYaxis()->SetTitle(" Anzahl Ereignisse");
-   hMasseCutJpsi->GetXaxis()->SetLabelSize(0.02);   // Größe der Zahlen des Histogramms
-   hMasseCutJpsi->GetYaxis()->SetLabelSize(0.02);   // Größe der Zahlen des Histogramms
-   hMasseCutJpsi->GetXaxis()->CenterTitle();  //Achsentitel in die Mitte der Achse legen
-   hMasseCutJpsi->GetYaxis()->CenterTitle();  //Achsentitel in die Mitte der Achse legen   
-   hMasseCutJpsi->SetLineColor(kBlue);
-   hMasseCutJpsi->SetFillColor(kBlue);
-   
-   TH1F *hMasseCutJpsiBackground   = new TH1F("hMasseCutJpsiBackground"," pp->ee Masse M fuer Cut: Jpsi (Background) ",1000,0,130);
-   hMasseCutJpsiBackground->GetXaxis()->SetTitle(" M in GeV");
-   hMasseCutJpsiBackground->GetYaxis()->SetTitle(" Anzahl Ereignisse");
-   hMasseCutJpsiBackground->GetXaxis()->SetLabelSize(0.02);   // Größe der Zahlen des Histogramms
-   hMasseCutJpsiBackground->GetYaxis()->SetLabelSize(0.02);   // Größe der Zahlen des Histogramms
-   hMasseCutJpsiBackground->GetXaxis()->CenterTitle();  //Achsentitel in die Mitte der Achse legen
-   hMasseCutJpsiBackground->GetYaxis()->CenterTitle();  //Achsentitel in die Mitte der Achse legen   
-   hMasseCutJpsiBackground->SetLineColor(kYellow);
-   hMasseCutJpsiBackground->SetFillColor(kYellow);
-   
-   
-      for (Int_t i=0; i<nentries; i++) {
-       tree->GetEntry(i);
-       Ht=pt1+pt2;
-      
-      //  if(M>2,0&&M<5,16&&pt1>2,9&&pt1<6,2&&pt2>2,9&&pt2<6,2){      // selektiert einfach alle 100000 Events! (Fehler) Cut für das J/Psi Teilchen im Massenspektrum pp->ee
-        if(M>2.0&&M<5.16&&pt1>2.9&&pt1<19.72&&pt2>2.9&&pt2<19.72){
-       hMasseCutJpsi->Fill(M);
-       
-      }
-      else{//hMasseCutJpsiBackground->Fill(M);
-          }
-      
-      
-            if( (!(pt2>20&&pt1>20&&M>75)) && !(M>2.0&&M<5.16&&pt1>2.9&&pt1<19.72&&pt2>2.9&&pt2<19.72)  ){
-      hMasseCutJpsiBackground->Fill(M);    
-      }
-
-      }
-      
-   hStackJpsi->Add(hMasseCutJpsiBackground);
-   hStackJpsi->Add(hMasseCutJpsi);
-   hStackJpsi->Add(hMasseCut);
-   
+ 
    
    //Ende JPsi Cuts
    
    
       //Beginn: Cuts für das Bottonium
    
-   
-   THStack *hStackBottonium = new THStack("hStackBottonium"," Background (Magenta) Z0 (Rot)  J/Psi (Blau) und Bottonium (Grün) "); // Histogramme aufeinanderlegen
-   
-   
-   TH1F *hMasseCutBottonium   = new TH1F("hMasseCutBottonium"," pp->ee Masse M fuer Cut: Bottonium ",1000,0,130);
-   hMasseCutBottonium->GetXaxis()->SetTitle(" M in GeV");
-   hMasseCutBottonium->GetYaxis()->SetTitle(" Anzahl Ereignisse");
-   hMasseCutBottonium->GetXaxis()->SetLabelSize(0.02);   // Größe der Zahlen des Histogramms
-   hMasseCutBottonium->GetYaxis()->SetLabelSize(0.02);   // Größe der Zahlen des Histogramms
-   hMasseCutBottonium->GetXaxis()->CenterTitle();  //Achsentitel in die Mitte der Achse legen
-   hMasseCutBottonium->GetYaxis()->CenterTitle();  //Achsentitel in die Mitte der Achse legen   
-   hMasseCutBottonium->SetLineColor(kGreen);
-   hMasseCutBottonium->SetFillColor(kGreen);
-   
-   TH1F *hMasseCutBottoniumBackground   = new TH1F("hMasseCutBottoniumBackground"," pp->ee Masse M fuer Cut: Bottonium (Background) ",1000,0,130);
-   hMasseCutBottoniumBackground->GetXaxis()->SetTitle(" M in GeV");
-   hMasseCutBottoniumBackground->GetYaxis()->SetTitle(" Anzahl Ereignisse");
-   hMasseCutBottoniumBackground->GetXaxis()->SetLabelSize(0.02);   // Größe der Zahlen des Histogramms
-   hMasseCutBottoniumBackground->GetYaxis()->SetLabelSize(0.02);   // Größe der Zahlen des Histogramms
-   hMasseCutBottoniumBackground->GetXaxis()->CenterTitle();  //Achsentitel in die Mitte der Achse legen
-   hMasseCutBottoniumBackground->GetYaxis()->CenterTitle();  //Achsentitel in die Mitte der Achse legen   
-   hMasseCutBottoniumBackground->SetLineColor(kMagenta);
-   hMasseCutBottoniumBackground->SetFillColor(kMagenta);
-   
-   
-         for (Int_t i=0; i<nentries; i++) {
-       tree->GetEntry(i);
-       Ht=pt1+pt2;
-      
-      
-        if(Ht>6.6&&Ht<38&&pt1<23.3&&pt2<22.2&&M>7.9&&M<12.07){
-       hMasseCutBottonium->Fill(M);
-       
-      }
-      else{//hMasseCutBottoniumBackground->Fill(M);
-          }
-          
-      if( (!(pt2>20&&pt1>20&&M>75)) && !(M>2.0&&M<5.16&&pt1>2.9&&pt1<19.72&&pt2>2.9&&pt2<19.72) && !(Ht>6.6&&Ht<38&&pt1<23.3&&pt2<22.2&&M>7.9&&M<12.07)  ){  
-       hMasseCutBottoniumBackground->Fill(M);   
-      }
-          
-
-      }
-   
-   hStackBottonium->Add(hMasseCutBottoniumBackground);
-   hStackBottonium->Add(hMasseCutBottonium);
-   hStackBottonium->Add(hMasseCutJpsi);
-   hStackBottonium->Add(hMasseCut);
-   
-   
-   
-   hStack->Write();
-   hStackJpsi->Write();
-   hStackBottonium->Write();
-   //hMasseCut->Write();
-   hMasseCutBackground->Write();
-   hPt1Cut->Write();
-   
-   hMasseCutJpsi->Write();
-    hMasseCutJpsiBackground->Write();
-    
-    hMasseCutBottonium->Write();
-    hMasseCutBottoniumBackground->Write();
+  
 t1.Write();
 
 
@@ -494,35 +457,9 @@ t1.Write();
   //hMasseCut->Fit("gaus");
   
 
-
-   
-        // Create a TF1 object using the function defined above.
-      // The last three parameters specify the number of parameters
-      // for the function.
-
-//gStyle->SetOptFit(); //Fit-Parameter anzeigen
-
-   TF1 *fit1 = new TF1("fit1",fitf,0,150,3); 
-   TF1 *fit2 = new TF1("fit2",fitf2,0,150,3); 
-   
-
-   
-         // set the parameters to the mean and RMS of the histogram
-  fit1->SetParameters(500,hMasseCut->GetMean(),hMasseCut->GetRMS());
-  fit2->SetParameters(500,hMasseCut->GetMean(),hMasseCut->GetRMS());
-  
-       // give the parameters meaningful names
-  fit1->SetParNames ("Constant","Mean_value","Sigma");
-  fit2->SetParNames ("Constant","Mean_value","Sigma");
-  
-       // call TH1::Fit with the name of the TF1 object
-      //hMasseCut->Fit("fit1");
-    // hMasseCut->Fit("gaus","L");
   
   hMasseCut->Write();
-  fit1->Write();
-  fit2->Write();
-  
+
  
   // par[3] ist ein Array mit den 3 Parametern der Gaussfunktion
   double par [3] = {500.0,hMasseCut->GetMean(),hMasseCut->GetRMS()};
@@ -633,6 +570,24 @@ cout<< "  Anzahl Funktionsauswertungen bis das Minimum erreicht ist :"<<counter<
 cout <<endl;
 
 
+//int bmin = hMasseCut->GetXaxis()->FindBin(0)
+//int bmax = hMasseCut->GetXaxis()->FindBin(110)
+//double integral = hMasseCut->Integral(bmin,bmax);
+//cout<< "  Integral ueber Histogramm hMasseCut :   bmin="<<bmin<<" bmax="<<bmax<<"  Integral="<<integral<<endl;
+
+par[1]=parameter1;
+par[2]=parameter2;
+double xwert[1];
+double integralPDF=0.0;
+
+for(double x=0;x<110;x=x+0.01){
+    xwert[0]=x;
+//cout<<breitwigner2(xwert,par)<<"  x= "<<x<<endl;
+integralPDF = integralPDF + 0.01*breitwigner2(xwert,par);
+}
+cout << " Integral ueber Breit-Wigner-Funktion = " << integralPDF<<endl;
+cout << " Integral ueber Histogramm hMasseCut = " << hMasseCut->Integral(0,1001)<<endl;
+// Verhältnis 6,401188647 
 
 
 //Minimierung der gleichen Funktion mittels TMinuit2-------------------------------------------------------------
@@ -685,32 +640,7 @@ ROOT::Math::Functor f5(&likelihoodBreitWignerMinus,2); //Minuit2 findet hier das
    
 // Beginn-Minimierung per Root (GSLMinimizer)-------------------------------------------------------------------
 
- // Choose method upon creation between:
-   // kConjugateFR, kConjugatePR, kVectorBFGS,
-   // kVectorBFGS2, kSteepestDescent
-   ROOT::Math::GSLMinimizer min2( ROOT::Math::kVectorBFGS );
  
-   min2.SetMaxFunctionCalls(1000000);
-   min2.SetMaxIterations(100000);
-   min2.SetTolerance(0.001);
- 
-   ROOT::Math::Functor f6(&likelihoodxy,2); 
-   double step2[2] = {0.01,0.01};
-   double variable2[2] = {80.0,6.0};
- 
-   min2.SetFunction(f6);
- 
-   // Set the free variables to be minimized!
-   min2.SetVariable(0,"x",variable2[0], step2[0]);
-   min2.SetVariable(1,"y",variable2[1], step2[1]);
- 
-   min2.Minimize(); 
- 
-   const double *xs2 = min2.X();
-   cout << "GSLMinimizer_kVectorBFGS :  Minimum: f(" << xs2[0] << "," << xs2[1] << "): "  << likelihoodxy(xs) << endl;
-   cout << "number of function calls to reach the minimum :"<<min2.NCalls()<<endl;
-   cout << "minimizer provides error and error matrix: (0=false or 1=true) "<<min2.ProvidesError()<<endl;
-   cout << "min.Errors: "<<min2.Errors()<<endl;
 
 
 // Ende GSLMinimizer-Minimierung-------------------------------------------------------------------
@@ -742,7 +672,8 @@ par[2]=parameter2;
 
 // BreitWigner Fitten an Z0 Peak
 
-
+gStyle->SetOptFit(1111);
+gStyle->SetOptStat(1111);
 
    TF1 *gauss1 = new TF1("gauss1",gauss,0,150,3);
    gauss1->SetParameters(500,parameter1,parameter2);
@@ -750,21 +681,200 @@ par[2]=parameter2;
    gauss1->Write();
    
    TF1 *bw = new TF1("breitwigner3",breitwigner2,0,130,3);
-   bw->SetParameters(50.0,parameter1,parameter2);
+   bw->SetParameters(25.0,parameter1,parameter2);
    bw->SetParNames ("Normierungskonstante","Gamma","M");
    
    
-   hMasseCut->Fit("breitwigner3","L");
-   bw->Write();  
-   hMasseCut->Write();
+
    
 TCanvas *cMasseCutBreitWigner = new TCanvas("cMasseCutBreitWigner","c1",1600,1000);
 hMasseCut->Draw();
 bw->Draw("same");
 cMasseCutBreitWigner->SaveAs("cMasseCutBreitWigner.jpg");
 cMasseCutBreitWigner->Write();   
+
+// Fitten Breit-Wigner an Z0-Peak mit Root ##############################################################################################
+
+TF1 *func = new TF1("breitwignerRoot",breitwignerRoot,0, 130,3);
+   func->SetParameters(788.1,5.543,90.56);
+   func->SetParNames ("Normierungskonstante","Gamma","M");
+
    
+hMasseCut->Fit("breitwignerRoot","IL");
+//hMasseCut->Chisquare("breitwignerRoot");
+
+//hMasseCut->Chi2Test(hMasseCut2,"UW P ",res)
+
+TCanvas *cMasseCutBreitWigner2 = new TCanvas("cMasseCutbreitwignerRoot","c1",1600,1000);
+hMasseCut->Draw();
+cMasseCutBreitWigner2->SaveAs("cMasseCutbreitwignerRootOffsetPlus3.jpg");
+cMasseCutBreitWigner2->Write(); 
+
+func->Write();
+
+
+
+TF1 *func2 = new TF1("breitwignerRoot2",breitwignerRoot2,0, 130,3);
+   func2->SetParameters(1.0,5.0,95.0,3.0);
+   func2->SetParNames ("Normierungskonstante","Gamma","M","Offset");
    
+TF1 *func3 = new TF1("breitwignerRootGaus1",breitwignerRootGaus,0, 130,4);
+   func3->SetParameters(788.0,2.49,90.56,3.0585);
+   func3->SetParNames ("Normierungskonstante","Gamma","M","sigma"); 
+func3->Write();   
+
+
+
+//TF1 *vfit = new TF1("vfit1", "gaus", 0., 130.);    Fit damit funktioniert   fit vfit1
+
+TF1 *vfit = new TF1("vfit1", "TMath::Voigt", 0, 130);
+
+
+//vfit->SetParameters(1,1);
+vfit->Write();
+
+//   TF1 *f2 = new TF1("f2", "TMath::Voigt(x,[0],[1],4)",-4,4);
+//   f2->SetParameters(1,1);
+
+
+
+
+TCanvas *c9 = new TCanvas("c1","c1",1600,1000);
+hMasseCut2->Draw();
+func3->Draw("same");
+c9->SaveAs("Voigfunktion_und_Z0Massenpeak.jpg");
+c9->Write();
+
+
+//hMasseCut2->Fit("breitwignerRoot2","L");
+//TCanvas *cMasseCutBreitWigner3 = new TCanvas("cMasseCutbreitwignerRoot2_Normierungskonstante","c1",1600,1000);
+//hMasseCut2->Draw();
+//cMasseCutBreitWigner3->SaveAs("cMasseCutbreitwignerRoot2Offset.jpg");
+//cMasseCutBreitWigner3->Write(); 
+//func2->Write();
+
+// Ende Fitten Breit-Wigner an Z0-Peak mit Root ##############################################################################################
+   
+// füllen von hMasseRandom mit Zufallszahlen +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+TRandom *r0 = new TRandom();
+
+//hMasseRandom->FillRandom("gaus",10000);
+
+func->SetParameters(788.1,5.543,90.56);
+double random0,random1;
+
+// Histogramm mit Breit-Wigner verteilten Zufallszahlen füllen:
+  for (Int_t i=0; i<58680; i++) {
+  //random0 = r0->Rndm(i);
+  random0 = func->GetRandom();
+  
+  hMasseRandom2->Fill(random0);
+  }
+
+
+hMasseRandom2->Fit("breitwignerRoot","IL");
+hMasseRandom2->Write();
+
+TCanvas *crandom2 = new TCanvas("crandom2","c1",1600,1000);
+hMasseRandom2->Draw();
+crandom2->SaveAs("hMasseRandom2_nurBreitWigner.jpg");
+
+//func->SetParameters(788.1,2.49,91.18);
+func->SetParameters(788.1,2.49,90.56);
+
+  gRandom = r0;
+  sw.Start();
+  
+  
+// Histogramm mit gaussverteilten Zufallszahlen füllen:  
+    for (Int_t i=0; i<58680; i++) {
+     // Mean=90.6378 Sigma=4.54337
+     random1 = r0->Gaus(90.6378,4.54337);
+     hMasseRandom->Fill(random1);
+    
+  }
+  
+// Histogramm mit Voigtfunktion- verteilten Zufallszahlen füllen:  
+   for (Int_t i=0; i<58680; i++) {
+     random0 = func->GetRandom();
+     random1 = r0->Gaus(0,3.0585);
+     
+     hMasseRandom3->Fill(random0+random1);
+  }
+  
+
+
+  //Voigtfunktion:
+TF1 *voigt1 = new TF1("voigt1",breitgausfun, 0, 130 ,4);
+//voigt1->SetParameters(4.067,90.29,2513,9.266);
+voigt1->SetParameters(3.503,90.72,826.1,3.578);
+
+ voigt1->SetParNames ("Gamma","Mz","Normierungskonstante","sigma"); 
+voigt1->Write();  
+  
+  func3->SetParameters(788.0,2.49,90.56,3.0585);
+       for (Int_t i=0; i<58680; i++) {
+     
+     random1 = voigt1->GetRandom();
+     hMasseRandomVoigt->Fill(random1);
+    
+  }
+  hMasseRandomVoigt->Write();
+  
+  
+
+
+//gStyle->SetOptFit(1111);  
+hMasseRandom3->Fit("voigt1","IL");
+hMasseRandomVoigt->Fit("voigt1","IL");
+
+hMasseRandom->Fit("breitwignerRoot","IL");
+
+cout << " Fit der Voigtfunktion (also Faltung BreitWigner mit Gauss) an den echten Z0-Peak: "<<endl;
+//hMasseCut2->Fit("breitwignerRootGaus1","IL");
+
+hMasseCut2->Fit("voigt1","IL");
+hMasseCut2->Write();
+
+
+
+
+
+TCanvas *crandom = new TCanvas("crandom","c1",1600,1000);
+hMasseRandom3->Draw();
+crandom->SaveAs("hMasseRandom3_BreitWigner_mit_Gauss.jpg");
+  
+hMasseRandom->Write();  
+hMasseRandom3->Write();  
+
+
+Double_t res[1000];
+
+
+   cout << " Chi-Quadrat-Test fuer Vergleich Gauss-Verteilung mit Z0-Peak: (Mean=90.6378 Sigma=4.54337) "<<endl;
+hMasseRandom->Chi2Test(hMasseCut,"UW P ",res);
+   cout << " Chi-Quadrat-Test fuer Vergleich Breit-Wigner-Verteilung mit Z0-Peak: (Gamma=5.543 M=90.56) "<<endl;
+hMasseRandom2->Chi2Test(hMasseCut,"UW P ",res);
+ cout << " Chi-Quadrat-Test fuer Vergleich Breit-Wigner-Verteilung (Gamma=2.49 M=90.56) und Gauss-Addition (Sigma=3.0585,Mean=0.0) mit Z0-Peak: "<<endl;
+hMasseRandom3->Chi2Test(hMasseCut,"UW P ",res);
+
+
+cout << " Chi-Quadrat-Test fuer Vergleich Voigtfunktion mit realem Z0-Peak: "<<endl;
+hMasseRandomVoigt->Chi2Test(hMasseCut,"UW P ",res);
+voigt1->SetParameters(4.067,90.29,2513,9.266);
+cout << " Chi-Quadrat-Test fuer Vergleich Voigtfunktion mit Voigt-Zufallszahlen-Peak: "<<endl;
+hMasseRandomVoigt->Chi2Test(hMasseRandom3,"UW P ",res);
+
+
+// Chi-Quadrat-Test zwischen Histogramm und Funktion:
+cout << endl<<" Chisqare-Test  Z-Peak mit Voigt : "<<hMasseCut->Chisquare(voigt1)<<endl;
+cout << endl<<" Chisqare-Test  Z-Peak mit Breit-Wigner : "<<hMasseCut->Chisquare(func)<<endl;
+
+// ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+   //hMasseCut->Fit("breitwigner3","L");
+   bw->Write();  
+   hMasseCut->Write();
    
    
    //hMasseCut2->Fit("breitwigner3");
@@ -781,6 +891,10 @@ cMasseCutBreitWigner->Write();
    
    TF2 *Likelihood1 = new TF2("likelihood1d",likelihood1d,85,95,4,20,0);
    Likelihood1->Write();
+   
+   TF2 *breitwigner4 = new TF2("likelihoodBreitWignerMinusDraw",likelihoodBreitWignerMinusDraw,3,4,85,95,0);
+   breitwigner4->Write();
+   
 
 
 TCanvas *chMasseCut1 = new TCanvas("c1","c1",1600,1000);
@@ -793,6 +907,11 @@ TCanvas *c3 = new TCanvas("c3","c3",1600,1000);
 Likelihood1->Draw("LEGO");
 c3->SaveAs("CANVASpictureLikelihood.jpg");
 c3->Write();
+
+TCanvas *c31 = new TCanvas("c31","c31",1600,1000);
+breitwigner4->Draw("LEGO");
+c31->SaveAs("likelihoodBreitWignerMinusDraw.jpg");
+c31->Write();
 
 TCanvas *c4 = new TCanvas("c4","c4",1600,1000);
 f2->Draw("SURF2");         //  Optionen für Draw: LEGO,LEGO2, SURF2
@@ -845,11 +964,100 @@ Double_t breitwigner2(const Double_t *x, const Double_t *par)
    //f= gamma/( 0,159154943*(E-M)*(E-M)+ gamma*gamma/4);  (liefert die falsche Funktion)
   //https://en.wikipedia.org/wiki/Relativistic_Breit%E2%80%93Wigner_distribution:   (liefert die richtige BreitWigner Funktion)
   // This equation is written using natural units, ? = c = 1
+  //funktioniert:-----------------------------------
+  //g=sqrt(M*M*(M*M+gamma*gamma));
+  //k=2*sqrt(2)*M*gamma*g/(3.141592654*sqrt(M*M+g));
+ // f=300*k/( (E*E -M*M)*(E*E -M*M) +M*M*gamma*gamma);
+  //---------------------------------------------------------------------------------------------
+  double s;
+  s=E*E;
+  //f= 300*s/(M*M *((s-M*M)*(s-M*M)+s*s*gamma*gamma/(M*M)  ));
+  //f=300*s*gamma*gamma/( (s-M*M)*(s-M*M)+M*M*gamma*gamma);
+  //f=1/ ( (E*E -M*M)*(E*E -M*M) +M*M*gamma*gamma);
+  //(1/2Pi) gamma/((x-mean)*(x-mean) + gamma*gamma/4)
+  //f= 0,159154943 *gamma/((E-M)*(E-M) +gamma*gamma/4);
+  
+  //funktioniert:------------------------------
+  //double gammahalf = gamma/2.0;
+  //f=  300*gammahalf/(M_PI * ((E-M)*(E-M) + gammahalf*gammahalf));
+  //----------------------------------
+    double gammahalf = gamma/2.0;
+  f=  300*gammahalf/(M_PI * ((E-M)*(E-M) + gammahalf*gammahalf));
+   
+  return f;
+}
+
+Double_t breitwignerRoot(const Double_t *x, const Double_t *par)
+{
+  double f;
+  double gamma,M,E,k,g; //1/2pi =0,159154943
+  E=x[0];
+  gamma=par[1];
+  M=par[2];
+
+  //funktioniert:------------------------------
+  double gammahalf = gamma/2.0;
+  f=  par[0]*gammahalf/(M_PI * ((E-M)*(E-M) + gammahalf*gammahalf));
+  //----------------------------------
+
+  return f;
+}
+
+Double_t breitwignerRootGaus(const Double_t *x, const Double_t *par)
+{
+  double f;
+  double gamma,M,E,k,g; //1/2pi =0,159154943
+  E=x[0];
+  gamma=par[1];
+  M=par[2];
+  double sigma=par[3];
+  //double mean=par[4];
+  //double eta=0.85;   //Chi2 Prob 0.76
+ // double eta=0.95;  Prob 0.66
+  double eta=0.80;
+
+  //funktioniert:------------------------------func3->SetParameters(788.0,2.49,90.56,3.0585,90.56);
+  double gammahalf = gamma/2.0;
+  f=  par[0]*  (eta*gammahalf/(M_PI * ((E-M)*(E-M) + gammahalf*gammahalf)) +(1-eta)*0.39894228*(TMath::Exp(-0.5*((x[0]-M)*(x[0]-M))/(sigma*sigma) ))/sigma);
+  
+       
+  //----------------------------------
+
+  return f;
+}
+
+Double_t breitwignerRoot2(const Double_t *x, const Double_t *par)
+{
+  double f;
+  double gamma,M,E,k,g; //1/2pi =0,159154943
+  E=x[0];
+  gamma=par[1];
+  M=par[2];
+   //f= gamma/( 0,159154943*(E-M)*(E-M)+ gamma*gamma/4);  (liefert die falsche Funktion)
+  //https://en.wikipedia.org/wiki/Relativistic_Breit%E2%80%93Wigner_distribution:   (liefert die richtige BreitWigner Funktion)
+  // This equation is written using natural units, ? = c = 1
+  //funktioniert:-----------------------------------
+  /*
   g=sqrt(M*M*(M*M+gamma*gamma));
   k=2*sqrt(2)*M*gamma*g/(3.141592654*sqrt(M*M+g));
+  f=par[0]*k/( (E*E -M*M)*(E*E -M*M) +M*M*gamma*gamma);
+  */
   
-  f=400*k/( (E*E -M*M)*(E*E -M*M) +M*M*gamma*gamma);
+  //---------------------------------------------------------------------------------------------
+  double s;
+  s=E*E;
+  //f= 300*s/(M*M *((s-M*M)*(s-M*M)+s*s*gamma*gamma/(M*M)  ));
+  //f=300*s*gamma*gamma/( (s-M*M)*(s-M*M)+M*M*gamma*gamma);
+  //f=1/ ( (E*E -M*M)*(E*E -M*M) +M*M*gamma*gamma);
+  //(1/2Pi) gamma/((x-mean)*(x-mean) + gamma*gamma/4)
+  //f= 0,159154943 *gamma/((E-M)*(E-M) +gamma*gamma/4);
   
+  //funktioniert:------------------------------
+  //double gammahalf = gamma/2.0;
+  //f=  300*gammahalf/(M_PI * ((E-M)*(E-M) + gammahalf*gammahalf));
+  //----------------------------------
+   double gammahalf = gamma/2.0;
+  f=  par[3]+par[0]*gammahalf/(M_PI * ((E-M)*(E-M) + gammahalf*gammahalf));
   return f;
 }
 
@@ -888,6 +1096,22 @@ Double_t likelihoodBreitWigner(const Double_t *x){
 }
 
 Double_t likelihoodBreitWignerMinus(const Double_t *x){
+    Double_t Likelihood=0.0;
+    double xwert[2];
+    
+
+  for (Int_t i=0; i<AnzahlEvents; i++) {  //6675 ist die Anzahl an Z0-Events
+
+       //xwerte[i] enthält den Wert M für Event i
+       xwert[0]=xwerte[i];
+  Likelihood=Likelihood -  log(breitwignerMinuit2(xwert,x));//x sind hier die beiden Fitparameter
+  //  LogLikelihoodfunktion als Summe aller Einzelfunktionswerte der Zufallsvariablen xwert[0]=M
+ 
+  }
+  return Likelihood;
+}
+
+Double_t likelihoodBreitWignerMinusDraw(const Double_t *x,const Double_t *par){
     Double_t Likelihood=0.0;
     double xwert[2];
     
@@ -1143,3 +1367,56 @@ int NumericalMinimization4()
  
    return 0;
 }
+
+/*--------------------------------------------------------------------*/
+Double_t breitgausfun(Double_t *x, Double_t *par) /*--------------------------------------------------------------------*/
+{
+
+//Fit parameters:
+//par[0]=Width (scale) Breit-Wigner
+//par[1]=Most Probable (MP, location) Breit mean
+//par[2]=Total area (integral -inf to inf, normalization constant)
+//par[3]=Width (sigma) of convoluted Gaussian function
+//
+//In the Landau distribution (represented by the CERNLIB approximation), //the maximum is located at x=-0.22278298 with the location parameter=0.
+//This shift is corrected within this function, so that the actual
+//maximum is identical to the MP parameter.
+
+// Numeric constants
+Double_t invsq2pi = 0.3989422804014; // (2 pi)^(-1/2)
+Double_t twoPi = 6.2831853071795;//2Pi
+
+// Control constants
+Double_t np = 100.0; // number of convolution steps
+Double_t sc = .4; // convolution extends to +-sc Gaussian sigmas
+
+// Variables
+Double_t xx;
+Double_t fland;
+Double_t sum = 0.0;
+Double_t xlow,xupp;
+Double_t step;
+Double_t i;
+
+// Range of convolution integral
+xlow = x[0] - sc * par[3];
+xupp = x[0] + sc * par[3];
+
+step = (xupp-xlow) / np;
+
+// Convolution integral of Breit and Gaussian by sum
+for(i=1.0; i<=np/2; i++) {
+xx = xlow + (i-.5) * step;
+fland = TMath::BreitWigner(xx,par[1],par[0]);
+sum += fland * TMath::Gaus(x[0],xx,par[3]);
+
+xx = xupp - (i-.5) * step;
+fland = TMath::BreitWigner(xx,par[1],par[0]);
+sum += fland * TMath::Gaus(x[0],xx,par[3]);
+}
+
+return (par[2] * step * sum * invsq2pi / par[3]);
+}
+
+
+
